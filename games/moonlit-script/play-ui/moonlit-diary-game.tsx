@@ -1,9 +1,9 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react"
+import { ReturnToOfficialLink } from "@/components/official-site/return-to-official-link"
 import { cn } from "@/lib/utils"
 import {
   LETTER_FINAL_BLOCK,
@@ -97,9 +97,12 @@ export function MoonlitDiaryGame({ gameId = GAME_SLUG }: { gameId?: string }) {
             <BookOpen className="h-4 w-4" aria-hidden />
             月下の手記
           </span>
-          <Link href="/" className="text-xs text-[#6b5f52] underline-offset-4 hover:text-[#2a231c] hover:underline">
+          <ReturnToOfficialLink
+            href="/"
+            className="text-xs text-[#6b5f52] underline-offset-4 hover:text-[#2a231c] hover:underline"
+          >
             公式サイトへ
-          </Link>
+          </ReturnToOfficialLink>
         </div>
       </header>
 
@@ -195,15 +198,15 @@ export function MoonlitDiaryGame({ gameId = GAME_SLUG }: { gameId?: string }) {
                 宛先：みーちゃんへ
               </p>
               <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <Link
+                <ReturnToOfficialLink
                   href="/works"
                   className="rounded-full border border-[#a89882] bg-[#faf6ef] px-6 py-2.5 text-sm text-[#3d3429] hover:bg-[#fffefb]"
                 >
                   作品一覧へ
-                </Link>
-                <Link href="/" className="text-sm text-[#6b5f52] underline-offset-4 hover:underline">
+                </ReturnToOfficialLink>
+                <ReturnToOfficialLink href="/" className="text-sm text-[#6b5f52] underline-offset-4 hover:underline">
                   トップへ
-                </Link>
+                </ReturnToOfficialLink>
               </div>
             </div>
           </div>

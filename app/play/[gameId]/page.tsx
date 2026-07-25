@@ -2,8 +2,8 @@
 
 import { Suspense, use, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
-import Link from "next/link"
 import { LS_ACCOUNT, LS_SESSION } from "@/lib/storage-keys"
+import { ReturnToOfficialLink } from "@/components/official-site/return-to-official-link"
 import { MoonlitDiaryGame } from "@/games/moonlit-script/play-ui/moonlit-diary-game"
 
 function PlayFrame({ gameId }: { gameId: string }) {
@@ -72,9 +72,9 @@ function PlayFrame({ gameId }: { gameId: string }) {
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm">
         <span className="font-mono text-xs text-muted-foreground">play / {gameId}</span>
-        <Link href="/" className="text-primary hover:underline">
+        <ReturnToOfficialLink href="/" className="text-primary hover:underline">
           公式サイトへ
-        </Link>
+        </ReturnToOfficialLink>
       </header>
       <iframe title="game" className="min-h-0 w-full flex-1 border-0 bg-black" src={iframeSrc} />
     </div>

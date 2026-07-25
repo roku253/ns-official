@@ -1,4 +1,7 @@
+"use client"
+
 import { playEntryPathForCase } from "@/lib/platform/game-routing.generated"
+import { navigateWithOfficialLeaveLoader } from "@/lib/official/show-official-leave-loader"
 import { LS_ACCOUNT } from "@/lib/storage-keys"
 
 /**
@@ -14,7 +17,7 @@ export function setActiveWorkAndOpenPortal(caseId: string) {
   const id = (caseId || "").trim()
   if (!id) return
   window.localStorage.setItem(LS_ACCOUNT.CASE_ID, id)
-  window.location.assign(playEntryPathForCase(id))
+  navigateWithOfficialLeaveLoader(playEntryPathForCase(id))
 }
 
 /** 続きから等: case_id は既に保存済みのとき */
@@ -22,5 +25,5 @@ export function openPlayEntry(caseId: string) {
   if (typeof window === "undefined") return
   const id = (caseId || "").trim()
   if (!id) return
-  window.location.assign(playEntryPathForCase(id))
+  navigateWithOfficialLeaveLoader(playEntryPathForCase(id))
 }

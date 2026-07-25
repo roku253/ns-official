@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { setActiveWorkAndOpenPortal } from "@/lib/official/play-work-navigation"
+import { navigateWithOfficialLeaveLoader } from "@/lib/official/show-official-leave-loader"
 import { LS_ACCOUNT, LS_SESSION } from "@/lib/storage-keys"
 import { cn } from "@/lib/utils"
 
@@ -52,7 +53,7 @@ async function openExternalWithToken(
   }
   const base = externalUrl.trim()
   const sep = base.includes("?") ? "&" : "?"
-  window.location.assign(`${base}${sep}token=${encodeURIComponent(data.token)}`)
+  navigateWithOfficialLeaveLoader(`${base}${sep}token=${encodeURIComponent(data.token)}`)
   return { ok: true }
 }
 

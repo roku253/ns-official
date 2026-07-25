@@ -27,10 +27,12 @@ npm run dev                  # http://localhost:3000
 
 手順・env・確認項目は [`DEPLOY.md`](./DEPLOY.md)。
 
-- Vercel: `nazo-portal`（https://nazo-portal.vercel.app）
+- GitHub: https://github.com/roku253/ns-official
+- Vercel: `nazo-portal`（https://nazo-portal.vercel.app）— Root はリポ直下
 - rewrite 先: `https://koko-ni-iru.vercel.app/play/koko-ni-iru`
 - Apps Script 正本: この配下の `apps-script/`
 
 ## 旧モノリス
 
 以前の一体型は `メイン画面/` にアーカイブ（[`ARCHIVE.md`](../メイン画面/ARCHIVE.md)）。
+GitHub 旧リポ `nazo-portal` もアーカイブ扱い。

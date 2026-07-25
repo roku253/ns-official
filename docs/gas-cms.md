@@ -38,11 +38,15 @@
 
 ## デプロイ手順
 
-1. [gas/cms-actions.gs](../gas/cms-actions.gs) の関数を Apps Script プロジェクトに貼る（または同等のシート読み書きに置き換え）
-2. `doPost` に `publicGetNews` / `adminGetNews` / `adminSetNews` を追加
-3. ウェブアプリとして再デプロイ（新しいデプロイ URL が発行されたら Vercel / `.env` の GAS URL を更新）
-4. `/admin/news` で保存 → 公式 `/news` をリロードして反映を確認
-5. `/admin/works` で詳細を保存 → 作品詳細ページで反映を確認
+1. GAS エディタの `コード.gs` を [gas/コード.gs](../gas/コード.gs) の内容で置き換える（ファイル全体をコピー＆ペースト）
+2. ウェブアプリとして再デプロイ（新しいデプロイ URL が発行されたら Vercel / `.env` の GAS URL を更新）
+3. `/admin/news` で保存 → 公式 `/news` をリロードして反映を確認
+4. `/admin/works` で詳細を保存 → 作品詳細ページで反映を確認
+
+保存先は `NSPlatform` シートの `key=news`（`works_catalog` と同じ key/value 方式）。
+
+断片だけ欲しい場合は [gas/cms-actions.gs](../gas/cms-actions.gs) を参照（統合済み本体は `gas/コード.gs`）。
+
 
 ## フォールバック
 

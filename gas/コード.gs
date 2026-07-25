@@ -1,0 +1,2158 @@
+/*
+ * Apps Script 貼り付け用リファレンス (reference-code.gs.txt)
+ *
+ * 【重要】秘密情報はコードに書かない。GAS エディタの
+ * 「プロジェクトの設定 → スクリプト プロパティ」に以下のキーを設定すること:
+ *
+ *   PASSWORD_SALT            … パスワードハッシュ用ソルト。
+ *                              ※既存アカウントを壊さないため、これまでコードに
+ *                                書いていた値と全く同じ値を設定すること。
+ *                                変更すると全プレイヤーがログイン不能になる。
+ *   ADMIN_PORTAL_KEY         … 管理 API 用キー（従来どおり）。
+ *   SECRET_WORD__<caseId>    … 案件ごとの合言葉。例: SECRET_WORD__koko-ni-iru
+ *   ALLOWED_USERS__<caseId>  … 登録許可メール（カンマ区切り・小文字）。
+ *                              例: ALLOWED_USERS__koko-ni-iru = a@x.com,b@y.com
+ *   KEYWORD_ROUTES__<caseId> … 任意。キーワード→URL の JSON 文字列。
+ *                              例: {"あかいかぎ":"https://example.com/archive/phase-2"}
+ *
+ * 未設定の場合、合言葉認証・登録は fail-closed（全部拒否）になる。
+ */
+const CASES = {
+  "koko-ni-iru": {
+    /* secretWord / allowedUsers / keywordRoutes は Script Properties 側に移行済み */
+    mail: {
+      /*
+       * 実メール（MailApp）：謎解きを提供する運営・事務局の文面。件名・差出人もこちら。
+       */
+      providerSubject: "【謎解きPO】ご参加ありがとうございます（調査員IDの設定について）",
+      providerSenderName: "謎解きPO 運営事務局",
+      providerBodyLines: [
+        "この度は本ゲームにご参加いただき、ありがとうございます。",
+        "ゲームのメイン画面（調査ポータル）をご利用になるには、初回のみ、以下のURLから調査員IDとパスワードを設定してください。",
+        "設定がお済みの方は、ポータルのログイン画面に戻り、画面の案内にしたがって入場してください。",
+        "※ゲーム内の物語・任務に関する連絡は、ポータル内「連絡」に届きます。本メールは運営からの手続き連絡です。"
+      ],
+      /*
+       * ゲーム内「本部」連絡（ポータル・連絡タブのみ）。実メールには載せない。
+       */
+      subject: '依頼文が届きました',
+      senderName: '記録班・班長',
+      /*
+       * ポータル登録用（/setup）。LAN/本番は環境に合わせて変更。
+       * 下の urbanLegendBoardUrl は謎専用ページ — 192.168 不要。GitHub Pages / Neocities / 別ドメインなど任意。
+       */
+      accountSetupUrl: "https://nazo-portal.vercel.app/setup?case=koko-ni-iru",
+      /* 物語：本文に差し込む段落（1要素＝1行相当）— main-portal-next/.../initial-hq-briefing.json と同期 */
+      storyLines: [
+        'お疲れ様です。新しい案件です。',
+        '',
+        '匿名フォームから依頼が来ました。霞ノ杜っていう町の「神隠し」案件みたいです。依頼文を添付するので読んでください。',
+        '',
+        '読みました？',
+        '',
+        '正直、最初は「よくある神隠し系か」と思ったんですが、',
+        '依頼文の書き方がちょっと気になって。',
+        '「なんで苦しいのかがわからない」って——',
+        '怪奇の目撃者ってこういう書き方しないんですよね、普通。',
+        'もっと「怖かった」とか「信じてほしい」とか、そういう方向になる。',
+        'これはなんか、別の話が混ざってる気がします。',
+        '',
+        'まあ、分析は調査しながらでいいです。',
+        '',
+        '気になったところから調べてみてください。',
+        'ログや記録で違和感があったことは、下の「班長に送る」に書いて送ってもらえれば。',
+        'どんな細かいことでも構いません。',
+        '',
+        'ひとつだけ。',
+        '依頼者は「何かわかったら教えてください」と書いています。',
+        'この案件、最終的に依頼者に何かを伝えることになるかもしれない。',
+        'それも頭の片隅に置いておいてもらえると助かります。',
+        '',
+        'よろしくお願いします。'
+      ],
+      requestLetterFileName: '依頼文.txt',
+      requestLetterLines: [
+        'はじめまして。匿名で申し訳ありません。',
+        '小学生のとき、クラスに友達がいました。その子が、ある夏からいなくなりました。転校したと聞いた気がするんですが、誰に聞いても「ああ、転校した子ね」くらいの反応で、それ以上の話になったことがなくて。',
+        '最近、霞ノ杜でその子のことを調べようとしたら、変なものを見つけて。読んでたらなんか苦しくなってきて。',
+        'なんで苦しいのかがわからなくて、眠れない日が続いてます。',
+        '調べてもらえますか。何かわかったら、教えてください。',
+        '── 匿名'
+      ],
+      /* 都市伝説掲示板（ミラー等）。実装時は自分のホスティング URL に差し替え */
+      urbanLegendBoardUrl: "https://roku253.github.io/urban-legend-board/"
+    }
+  }
+};
+
+const DEFAULT_CASE_ID = "koko-ni-iru";
+
+/** 別端末ログイン通知メール（loginContext が explicit のときのみ送信） */
+var LOGIN_ALERT_MAIL = {
+  subject: "【謎解きPO】別端末でのログインがありました",
+  senderName: "謎解きPO 運営事務局"
+};
+
+/** Script Properties アクセス（秘密情報は全部こちら） */
+function getScriptProps_() {
+  return PropertiesService.getScriptProperties();
+}
+
+/** パスワードハッシュ用ソルト（Script Properties: PASSWORD_SALT）。未設定なら認証を止める */
+function getPasswordSalt_() {
+  var salt = String(getScriptProps_().getProperty("PASSWORD_SALT") || "");
+  if (!salt) {
+    throw new Error("PASSWORD_SALT が Script Properties に未設定です。プロジェクトの設定 → スクリプト プロパティで設定してください。");
+  }
+  return salt;
+}
+
+/** 案件ごとの秘密情報（合言葉・許可メール・キーワードルート）を Script Properties から取得 */
+function getCaseSecrets_(caseId) {
+  var props = getScriptProps_();
+  var secretWord = String(props.getProperty("SECRET_WORD__" + caseId) || "").trim();
+  var allowedRaw = String(props.getProperty("ALLOWED_USERS__" + caseId) || "");
+  var allowedUsers = allowedRaw.split(",").map(function (s) {
+    return s.trim().toLowerCase();
+  }).filter(function (s) {
+    return s !== "";
+  });
+  var keywordRoutes = {};
+  var routesRaw = String(props.getProperty("KEYWORD_ROUTES__" + caseId) || "").trim();
+  if (routesRaw) {
+    try {
+      keywordRoutes = JSON.parse(routesRaw) || {};
+    } catch (e) {
+      keywordRoutes = {};
+    }
+  }
+  return { secretWord: secretWord, allowedUsers: allowedUsers, keywordRoutes: keywordRoutes };
+}
+
+/** 調査員アカウント・進行データ用シート名（自動で1枚作成） */
+const INVESTIGATORS_SHEET_NAME = "Investigators";
+
+/** saveProgress / 管理者上書きのたびに progress_json 全文をチャンク保存（復元用・セル5万文字制限回避） */
+const PROGRESS_SNAPSHOTS_SHEET_NAME = "ProgressSnapshots";
+var SNAPSHOT_CHUNK_SIZE = 45000;
+var SNAPSHOT_MAX_PER_LOGIN = 80;
+
+const INVEST_COL = {
+  LOGIN_ID: 1,
+  PASSWORD_HASH: 2,
+  EMAIL: 3,
+  UPDATED_AT: 4,
+  LAST_DEVICE_ID: 5,
+  LAST_LOGIN_AT: 6,
+  MASTER_TOKEN: 7,
+  /** JSON 配列。ログイン済み端末の deviceId 一覧（別端末通知は未登録のみ） */
+  KNOWN_DEVICE_IDS: 8
+};
+
+/** 公式サイト・作品公開設定（運営が管理ポータルから更新。プレイヤーは publicGetWorksCatalog で取得） */
+const NS_PLATFORM_SHEET_NAME = "NSPlatform";
+var NS_PLATFORM_KEY_WORKS_CATALOG = "works_catalog";
+var NS_PLATFORM_KEY_NEWS = "news";
+
+/**
+ * NSPlatform / works_catalog — JSON スキーマメモ（実体のパース・正規化は Next 公式ポータル側で実施）
+ *
+ * 【v2 推奨】作品（engine 単位）× ストーリー（case id）の二段ゲート。公式一覧では両方が真のときだけ表示。
+ * {
+ *   "featuredId": "<storyId>",
+ *   "overrides": { "<storyId>": { "title": "...", "tagline": "...", "subtitle": "..." } },
+ *   "works": {
+ *     "<workKey>": {
+ *       "published": true,
+ *       "featuredId": "<storyId>",
+ *       "stories": {
+ *         "<storyId>": { "published": true, "title": "..." }
+ *       }
+ *     }
+ *   }
+ * }
+ * workKey は静的カタログの enginePackage（単体エンジンは case id と同一になり得る）。
+ *
+ * 【レガシー v1】フラットな ID リストのみ（後方互換）:
+ * { "published": ["case-a","case-b"], "featuredId": "case-a", "overrides": {} }
+ * published 配列がある場合のみホワイトリストとして絞り込み。未設定時は従来どおり静的定義に従う。
+ *
+ * 運営が新「作品公開」画面から保存すると v2 形式で上書きされる。Sheets 上は JSON 文字列のまま。
+ */
+
+/** 外部サイト用ワンタイム／回数制限付きアクセストークン */
+const ACCESS_TOKENS_SHEET_NAME = "AccessTokens";
+const AT_COL = {
+  TOKEN: 1,
+  LOGIN_ID: 2,
+  CASE_ID: 3,
+  RESOURCE_KEY: 4,
+  CREATED_AT: 5,
+  EXPIRES_AT: 6,
+  USED_COUNT: 7,
+  MAX_USES: 8
+};
+
+/** ユーザー×案件（case_id）ごとの進行データ */
+const GAME_PROGRESS_SHEET_NAME = "GameProgress";
+const GP_COL = {
+  LOGIN_ID: 1,
+  CASE_ID: 2,
+  PROGRESS_JSON: 3,
+  UPDATED_AT: 4
+};
+
+/** 公式・外部ページ用の ID/パスワード（resource_key で種別を固定。例: urban-board, archive-phase-2） */
+const NS_OFFICIAL_CREDENTIALS_SHEET_NAME = "NSOfficialCredentials";
+const OC_COL = {
+  LOGIN_ID: 1,
+  RESOURCE_KEY: 2,
+  LABEL: 3,
+  URL: 4,
+  USERNAME: 5,
+  PASSWORD: 6,
+  NOTES: 7,
+  UPDATED_AT: 8
+};
+
+/**
+ * スタンドアロン（script.google.com で「単体」作成）のときは必須。
+ * URL https://docs.google.com/spreadsheets/d/【この長いID】/edit の ID をコピーして貼る。
+ * スプレッドシートを開いた状態で「拡張機能 → Apps Script」で作った「連結」プロジェクトなら "" のまま。
+ * openById を使う場合は apps-script/appsscript.json の oauthScopes をプロジェクトに反映し、再承認すること。
+ */
+const SPREADSHEET_ID = "";
+
+/** 連結なら表に紐づくスプレッドシート、スタンドアロンなら openById */
+function getTargetSpreadsheet() {
+  var id = String(SPREADSHEET_ID || "").trim();
+  if (id) {
+    return SpreadsheetApp.openById(id);
+  }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getCaseConfig(caseId) {
+  var id = caseId && CASES[caseId] ? caseId : DEFAULT_CASE_ID;
+  var base = CASES[id];
+  var secrets = getCaseSecrets_(id);
+  var merged = {};
+  for (var k in base) {
+    if (Object.prototype.hasOwnProperty.call(base, k)) merged[k] = base[k];
+  }
+  merged.secretWord = secrets.secretWord;
+  merged.allowedUsers = secrets.allowedUsers;
+  merged.keywordRoutes = secrets.keywordRoutes;
+  return merged;
+}
+
+function hashPassword(password) {
+  var raw = String(password || "") + getPasswordSalt_();
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, raw, Utilities.Charset.UTF_8);
+  return digest.map(function (byte) {
+    return ("0" + (byte & 0xFF).toString(16)).slice(-2);
+  }).join("");
+}
+
+function ensureInvestigatorExtraColumns(sh) {
+  var h5 = sh.getRange(1, INVEST_COL.LAST_DEVICE_ID).getValue();
+  if (h5 === "" || h5 === null) {
+    sh.getRange("E1:F1").setValues([[
+      "last_device_id",
+      "last_login_at"
+    ]]);
+  }
+  var h7 = sh.getRange(1, INVEST_COL.MASTER_TOKEN).getValue();
+  if (h7 === "" || h7 === null) {
+    sh.getRange(1, INVEST_COL.MASTER_TOKEN).setValue("master_token");
+  }
+  var h8 = sh.getRange(1, INVEST_COL.KNOWN_DEVICE_IDS).getValue();
+  if (h8 === "" || h8 === null) {
+    sh.getRange(1, INVEST_COL.KNOWN_DEVICE_IDS).setValue("known_device_ids");
+  }
+}
+
+/** @returns {string[]} */
+function parseKnownDeviceIds(cellValue, fallbackLastDeviceId) {
+  var raw = String(cellValue || "").trim();
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        var out = [];
+        for (var i = 0; i < parsed.length; i++) {
+          var id = String(parsed[i] || "").trim();
+          if (id && out.indexOf(id) < 0) out.push(id);
+        }
+        if (out.length > 0) return out;
+      }
+    } catch (e) {
+      /* 旧形式の単一 ID 文字列 */
+      if (raw.indexOf("[") !== 0 && raw.length > 8) return [raw];
+    }
+  }
+  var fb = String(fallbackLastDeviceId || "").trim();
+  return fb ? [fb] : [];
+}
+
+/** @param {string[]} ids @param {string} deviceId @returns {string[]} */
+function registerKnownDeviceId(ids, deviceId) {
+  var id = String(deviceId || "").trim();
+  if (!id) return ids || [];
+  var list = ids ? ids.slice() : [];
+  if (list.indexOf(id) < 0) list.push(id);
+  return list;
+}
+
+function getInvestigatorsSheet() {
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(INVESTIGATORS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(INVESTIGATORS_SHEET_NAME);
+    sh.getRange("A1:H1").setValues([[
+      "login_id",
+      "password_hash",
+      "email",
+      "updated_at",
+      "last_device_id",
+      "last_login_at",
+      "master_token",
+      "known_device_ids"
+    ]]);
+    sh.setFrozenRows(1);
+  } else {
+    ensureInvestigatorExtraColumns(sh);
+  }
+  return sh;
+}
+
+function ensureProgressSnapshotsCaseIdColumn(sh) {
+  var h = sh.getRange(1, 7).getValue();
+  if (h === "" || h === null) {
+    sh.getRange(1, 7).setValue("case_id");
+  }
+}
+
+function getProgressSnapshotsSheet() {
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(PROGRESS_SNAPSHOTS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(PROGRESS_SNAPSHOTS_SHEET_NAME);
+    sh.getRange("A1:G1").setValues([[
+      "snapshot_id",
+      "login_id",
+      "created_at",
+      "chunk_index",
+      "chunk_total",
+      "chunk_data",
+      "case_id"
+    ]]);
+    sh.setFrozenRows(1);
+  } else {
+    ensureProgressSnapshotsCaseIdColumn(sh);
+  }
+  return sh;
+}
+
+function getGameProgressSheet() {
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(GAME_PROGRESS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(GAME_PROGRESS_SHEET_NAME);
+    sh.getRange("A1:D1").setValues([[
+      "login_id",
+      "case_id",
+      "progress_json",
+      "updated_at"
+    ]]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function findGameProgressRow(sheet, loginId, caseId) {
+  var id = String(loginId || "").trim();
+  var cid = String(caseId || "").trim();
+  if (!id || !cid) {
+    return null;
+  }
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === id && String(data[i][1]).trim() === cid) {
+      return {
+        rowIndex: i + 1,
+        progressJson: String(data[i][2] || "{}"),
+        updatedAt: String(data[i][3] || "")
+      };
+    }
+  }
+  return null;
+}
+
+function upsertGameProgress(loginId, caseId, jsonStr) {
+  var sh = getGameProgressSheet();
+  var row = findGameProgressRow(sh, loginId, caseId);
+  var now = new Date().toISOString();
+  var j = String(jsonStr || "{}");
+  if (row) {
+    sh.getRange(row.rowIndex, GP_COL.PROGRESS_JSON).setValue(j);
+    sh.getRange(row.rowIndex, GP_COL.UPDATED_AT).setValue(now);
+  } else {
+    sh.appendRow([String(loginId || "").trim(), String(caseId || "").trim(), j, now]);
+  }
+}
+
+/** GameProgress から進行データを読み取る */
+function readGameProgressJsonForLogin(loginId, caseId) {
+  var sh = getGameProgressSheet();
+  var row = findGameProgressRow(sh, loginId, caseId);
+  if (row) {
+    var gp = String(row.progressJson || "");
+    if (gp.trim() !== "" && gp.trim() !== "{}") {
+      return gp;
+    }
+  }
+  return "{}";
+}
+
+function getAccessTokensSheet() {
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(ACCESS_TOKENS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(ACCESS_TOKENS_SHEET_NAME);
+    sh.getRange("A1:H1").setValues([[
+      "token",
+      "login_id",
+      "case_id",
+      "resource_key",
+      "created_at",
+      "expires_at",
+      "used_count",
+      "max_uses"
+    ]]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function findAccessTokenRow(sheet, token) {
+  var t = String(token || "").trim();
+  if (!t) return null;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === t) {
+      return {
+        rowIndex: i + 1,
+        loginId: String(data[i][1] || ""),
+        caseId: String(data[i][2] || ""),
+        resourceKey: String(data[i][3] || ""),
+        createdAt: String(data[i][4] || ""),
+        expiresAt: String(data[i][5] || ""),
+        usedCount: Number(data[i][6] || 0),
+        maxUses: Number(data[i][7] || 0)
+      };
+    }
+  }
+  return null;
+}
+
+function issueAccessToken(data) {
+  var loginId = String(data.loginId || "").trim();
+  var password = String(data.password || "");
+  var caseId = String(data.caseId || "").trim() || DEFAULT_CASE_ID;
+  var resourceKey = String(data.resourceKey || "").trim();
+  if (!loginId || !password || !resourceKey) {
+    return { success: false, message: "loginId, password, resourceKey が必要です。" };
+  }
+  var shI = getInvestigatorsSheet();
+  var row = findInvestigatorRow(shI, loginId);
+  if (!row || hashPassword(password) !== row.hash) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var token = Utilities.getUuid();
+  var now = new Date().toISOString();
+  var expires = data.expiresAt ? String(data.expiresAt) : "";
+  var maxUses = typeof data.maxUses === "number" ? data.maxUses : 1000;
+  var shT = getAccessTokensSheet();
+  shT.appendRow([token, loginId, caseId, resourceKey, now, expires, 0, maxUses]);
+  return { success: true, token: token, expiresAt: expires, resourceKey: resourceKey };
+}
+
+/**
+ * アカウント×案件の権利付与（プレイ開始時に呼ぶ）。
+ * 既存の token 行が同 (loginId, caseId, resourceKey) に1つでもあればスキップし、
+ * 無ければ新たに master_token を再利用して行を追加（resource_key ごとに1行）。
+ *
+ * data: { loginId, masterToken, caseId, resources: string[] }
+ */
+function grantCaseAccess(data) {
+  var loginId = String(data.loginId || "").trim();
+  var masterToken = String(data.masterToken || "").trim();
+  var caseId = String(data.caseId || "").trim() || DEFAULT_CASE_ID;
+  var resources = Array.isArray(data.resources) ? data.resources : [];
+  if (!loginId || !masterToken || resources.length === 0) {
+    return { success: false, message: "loginId, masterToken, resources が必要です。" };
+  }
+  var shI = getInvestigatorsSheet();
+  var row = findInvestigatorRow(shI, loginId);
+  if (!row || String(row.masterToken).trim() !== masterToken) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+
+  var shT = getAccessTokensSheet();
+  var rows = shT.getDataRange().getValues();
+  var existing = {};
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][AT_COL.LOGIN_ID - 1]).trim() === loginId &&
+        String(rows[i][AT_COL.CASE_ID - 1]).trim() === caseId) {
+      existing[String(rows[i][AT_COL.RESOURCE_KEY - 1]).trim()] = true;
+    }
+  }
+  var now = new Date().toISOString();
+  var added = 0;
+  for (var j = 0; j < resources.length; j++) {
+    var rk = String(resources[j] || "").trim();
+    if (!rk) continue;
+    if (existing[rk]) continue;
+    var token = Utilities.getUuid();
+    shT.appendRow([token, loginId, caseId, rk, now, "", 0, 0]);
+    added++;
+  }
+  return { success: true, granted: added, message: "OK" };
+}
+
+/**
+ * 外部サイト用：このブラウザのアカウント (loginId + masterToken) が
+ * 該当の案件 × resource_key の権利を持っているかを判定する。
+ * URL にトークンを載せず、外部サイトの localStorage に保存した情報のみで認証可能。
+ *
+ * data: { loginId, masterToken, caseId, resourceKey }
+ */
+/**
+ * 短時間（既定30秒）の検証結果を ScriptCache に保持して、同一(loginId,caseId,resourceKey)の連打を吸収する。
+ * 検証 OK のときだけキャッシュする。NG は毎回再計算（後追いの権利付与をすぐ反映するため）。
+ */
+function _entitlementCacheKey(loginId, masterToken, caseId, resourceKey) {
+  return "ent:" + loginId + "|" + masterToken + "|" + caseId + "|" + resourceKey;
+}
+
+function validateEntitlement(data) {
+  var loginId = String(data.loginId || "").trim();
+  var masterToken = String(data.masterToken || "").trim();
+  var caseId = String(data.caseId || "").trim() || DEFAULT_CASE_ID;
+  var resourceKey = String(data.resourceKey || "").trim();
+  if (!loginId || !masterToken || !resourceKey) {
+    return { success: false, valid: false, message: "loginId, masterToken, resourceKey が必要です。" };
+  }
+
+  // ★ ScriptCache: 直近 OK のものはシートを触らずに即返す
+  var cache;
+  try { cache = CacheService.getScriptCache(); } catch (e) { cache = null; }
+  var cacheKey = _entitlementCacheKey(loginId, masterToken, caseId, resourceKey);
+  if (cache) {
+    var cached = cache.get(cacheKey);
+    if (cached === "ok") {
+      return {
+        success: true,
+        valid: true,
+        loginId: loginId,
+        caseId: caseId,
+        resourceKey: resourceKey,
+        cached: true
+      };
+    }
+  }
+
+  var shI = getInvestigatorsSheet();
+  var row = findInvestigatorRow(shI, loginId);
+  if (!row || String(row.masterToken).trim() !== masterToken) {
+    return { success: true, valid: false, message: "アカウント認証に失敗しました。" };
+  }
+  var shT = getAccessTokensSheet();
+  // ★ 全件 getDataRange ではなく LOGIN_ID 列だけ取って候補行をふるい落としてから値読みする
+  var lastRow = shT.getLastRow();
+  if (lastRow < 2) {
+    return { success: true, valid: false, message: "この案件の権利がありません。先に作品をプレイしてください。" };
+  }
+  var loginCol = shT.getRange(2, AT_COL.LOGIN_ID, lastRow - 1, 1).getValues();
+  var candidates = [];
+  for (var li = 0; li < loginCol.length; li++) {
+    if (String(loginCol[li][0]).trim() === loginId) candidates.push(li + 2);
+  }
+  if (candidates.length === 0) {
+    return { success: true, valid: false, message: "この案件の権利がありません。先に作品をプレイしてください。" };
+  }
+  // 候補行だけ全列読みで判定
+  for (var ci = 0; ci < candidates.length; ci++) {
+    var r = shT.getRange(candidates[ci], 1, 1, shT.getLastColumn()).getValues()[0];
+    if (String(r[AT_COL.CASE_ID - 1]).trim() !== caseId) continue;
+    if (String(r[AT_COL.RESOURCE_KEY - 1]).trim() !== resourceKey) continue;
+    var ex = String(r[AT_COL.EXPIRES_AT - 1] || "").trim();
+    if (ex) {
+      var d = new Date(ex);
+      if (!isNaN(d.getTime()) && new Date() > d) {
+        return { success: true, valid: false, message: "権利の有効期限が切れています。" };
+      }
+    }
+    if (cache) {
+      try { cache.put(cacheKey, "ok", 30); } catch (e) {}
+    }
+    return {
+      success: true,
+      valid: true,
+      loginId: loginId,
+      caseId: caseId,
+      resourceKey: resourceKey
+    };
+  }
+  return { success: true, valid: false, message: "この案件の権利がありません。先に作品をプレイしてください。" };
+}
+
+/**
+ * loginId + masterToken の照合のみ（読み取り専用・権利チェックなし）。
+ * Next サーバーが班長チャット API などでプレイヤー認証に使う。
+ */
+function verifyMasterToken(data) {
+  var loginId = String(data.loginId || "").trim();
+  var masterToken = String(data.masterToken || "").trim();
+  if (!loginId || !masterToken) {
+    return { success: true, valid: false, message: "loginId と masterToken が必要です。" };
+  }
+  var cache;
+  try { cache = CacheService.getScriptCache(); } catch (e) { cache = null; }
+  var cacheKey = "vmt::" + loginId + "::" + masterToken;
+  if (cache && cache.get(cacheKey) === "ok") {
+    return { success: true, valid: true, loginId: loginId, cached: true };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, loginId);
+  if (!row || String(row.masterToken || "").trim() !== masterToken) {
+    return { success: true, valid: false, message: "アカウント認証に失敗しました。" };
+  }
+  if (cache) {
+    try { cache.put(cacheKey, "ok", 300); } catch (e) {}
+  }
+  return { success: true, valid: true, loginId: loginId };
+}
+
+function validateAccessToken(data) {
+  var token = String(data.token || "").trim();
+  var resourceKey = String(data.resourceKey || "").trim();
+  if (!token) {
+    return { success: false, valid: false, message: "token が空です。" };
+  }
+  var sh = getAccessTokensSheet();
+  var hit = findAccessTokenRow(sh, token);
+  if (!hit) {
+    return { success: true, valid: false, message: "トークンが無効です。" };
+  }
+  if (resourceKey && String(hit.resourceKey) !== resourceKey) {
+    return { success: true, valid: false, message: "resource_key が一致しません。" };
+  }
+  if (hit.expiresAt) {
+    var ex = new Date(hit.expiresAt);
+    if (!isNaN(ex.getTime()) && new Date() > ex) {
+      return { success: true, valid: false, message: "トークンの有効期限が切れています。" };
+    }
+  }
+  var maxU = hit.maxUses || 0;
+  if (maxU > 0 && hit.usedCount >= maxU) {
+    return { success: true, valid: false, message: "使用回数の上限に達しています。" };
+  }
+  var consume = data.consume !== false;
+  if (consume) {
+    sh.getRange(hit.rowIndex, AT_COL.USED_COUNT).setValue(hit.usedCount + 1);
+  }
+  return {
+    success: true,
+    valid: true,
+    loginId: hit.loginId,
+    caseId: hit.caseId,
+    resourceKey: hit.resourceKey
+  };
+}
+
+function getOfficialCredentialsSheet() {
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(NS_OFFICIAL_CREDENTIALS_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(NS_OFFICIAL_CREDENTIALS_SHEET_NAME);
+    sh.getRange("A1:H1").setValues([[
+      "login_id",
+      "resource_key",
+      "label",
+      "url",
+      "username",
+      "password",
+      "notes",
+      "updated_at"
+    ]]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function buildGameProgressListForAdmin() {
+  var shInv = getInvestigatorsSheet();
+  var invData = shInv.getDataRange().getValues();
+  var emailByLogin = {};
+  for (var ii = 1; ii < invData.length; ii++) {
+    emailByLogin[String(invData[ii][0]).trim()] = String(invData[ii][2] || "");
+  }
+  var sh = getGameProgressSheet();
+  var data = sh.getDataRange().getValues();
+  var rows = [];
+  for (var j = 1; j < data.length; j++) {
+    var lid = String(data[j][0]).trim();
+    var cid = String(data[j][1]).trim();
+    var pj = String(data[j][2] || "{}");
+    rows.push({
+      loginId: lid,
+      email: emailByLogin[lid] || "",
+      caseId: cid,
+      updatedAt: String(data[j][3] || ""),
+      progressSummary: summarizeProgressForAdmin(pj)
+    });
+  }
+  return rows;
+}
+
+function migrateLoginIdInAuxiliarySheets(oldId, newId) {
+  var o = String(oldId || "").trim();
+  var n = String(newId || "").trim();
+  if (!o || !n || o === n) {
+    return;
+  }
+  var shGp = getGameProgressSheet();
+  var d = shGp.getDataRange().getValues();
+  for (var i = 1; i < d.length; i++) {
+    if (String(d[i][0]).trim() === o) {
+      shGp.getRange(i + 1, GP_COL.LOGIN_ID).setValue(n);
+    }
+  }
+  var shOc = getOfficialCredentialsSheet();
+  var d2 = shOc.getDataRange().getValues();
+  for (var j = 1; j < d2.length; j++) {
+    if (String(d2[j][0]).trim() === o) {
+      shOc.getRange(j + 1, OC_COL.LOGIN_ID).setValue(n);
+    }
+  }
+  var shSn = getProgressSnapshotsSheet();
+  var lr = shSn.getLastRow();
+  if (lr >= 2) {
+    var vals = shSn.getRange(2, 1, lr, 7).getValues();
+    for (var k = 0; k < vals.length; k++) {
+      if (String(vals[k][1]).trim() === o) {
+        shSn.getRange(k + 2, 2).setValue(n);
+      }
+    }
+  }
+}
+
+function getNSPlatformSheet() {
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(NS_PLATFORM_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(NS_PLATFORM_SHEET_NAME);
+    sh.getRange("A1:B1").setValues([["key", "value"]]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function readPlatformKeyValue(key) {
+  var sh = getNSPlatformSheet();
+  var data = sh.getDataRange().getValues();
+  var k = String(key || "");
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === k) {
+      return String(data[i][1] || "");
+    }
+  }
+  return "";
+}
+
+function writePlatformKeyValue(key, value) {
+  var sh = getNSPlatformSheet();
+  var data = sh.getDataRange().getValues();
+  var k = String(key || "");
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === k) {
+      sh.getRange(i + 1, 2).setValue(String(value || ""));
+      return;
+    }
+  }
+  sh.appendRow([k, String(value || "")]);
+}
+
+/**
+ * 公開用（認証不要）。v2 では works.*.published と works.*.stories.*.published を含む JSON をそのまま返す。
+ * シート未作成・未設定時は success のみ（catalog は空オブジェクト相当）。
+ */
+function publicGetWorksCatalog() {
+  var raw = readPlatformKeyValue(NS_PLATFORM_KEY_WORKS_CATALOG);
+  var catalog = {};
+  if (raw) {
+    try {
+      catalog = JSON.parse(raw);
+    } catch (e) {
+      catalog = {};
+    }
+  }
+  return { success: true, catalog: catalog };
+}
+
+function adminGetWorksCatalog(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  return publicGetWorksCatalog();
+}
+
+function adminSetWorksCatalog(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var cat = data.catalog;
+  var jsonStr = typeof cat === "string" ? cat : JSON.stringify(cat || {});
+  writePlatformKeyValue(NS_PLATFORM_KEY_WORKS_CATALOG, jsonStr);
+  return { success: true, message: "作品カタログを保存しました。" };
+}
+
+function publicGetNews() {
+  var raw = readPlatformKeyValue(NS_PLATFORM_KEY_NEWS);
+  var news = { items: [] };
+  if (raw) {
+    try {
+      news = JSON.parse(raw);
+    } catch (e) {
+      news = { items: [] };
+    }
+  }
+  if (!news || typeof news !== "object") news = { items: [] };
+  if (!Array.isArray(news.items)) news.items = [];
+  return { success: true, news: news };
+}
+
+function adminGetNews(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  return publicGetNews();
+}
+
+function adminSetNews(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var news = data.news;
+  if (!news || typeof news !== "object") news = { items: [] };
+  if (!Array.isArray(news.items)) news.items = [];
+  news.updatedAt = new Date().toISOString();
+  writePlatformKeyValue(NS_PLATFORM_KEY_NEWS, JSON.stringify(news));
+  return { success: true, news: news, message: "お知らせを保存しました。" };
+}
+
+/**
+ * 1 回のセーブ内容をそのまま複数行に分割して追記し、古いものを掃除する
+ */
+function appendProgressSnapshot(loginId, jsonStr, caseIdOpt) {
+  var caseIdSnap = String(caseIdOpt || "").trim();
+  var id = Utilities.getUuid();
+  var now = new Date().toISOString();
+  var raw = String(jsonStr || "{}");
+  var sh = getProgressSnapshotsSheet();
+  var chunks = [];
+  for (var i = 0; i < raw.length; i += SNAPSHOT_CHUNK_SIZE) {
+    chunks.push(raw.substring(i, i + SNAPSHOT_CHUNK_SIZE));
+  }
+  if (chunks.length === 0) {
+    chunks.push("");
+  }
+  var startRow = sh.getLastRow() + 1;
+  var rows = [];
+  for (var c = 0; c < chunks.length; c++) {
+    rows.push([id, loginId, now, c, chunks.length, chunks[c], caseIdSnap]);
+  }
+  /* Sheet#getRange(row, col, numRows, numCols) — 第3・4引数は「個数」で終了座標ではない */
+  sh.getRange(startRow, 1, rows.length, 7).setValues(rows);
+  pruneSnapshotsForLogin(loginId, SNAPSHOT_MAX_PER_LOGIN);
+}
+
+function pruneSnapshotsForLogin(loginId, maxKeep) {
+  var sh = getProgressSnapshotsSheet();
+  var lr = sh.getLastRow();
+  if (lr < 2) {
+    return;
+  }
+  var numDataRows = lr - 1;
+  var data = sh.getRange(2, 1, numDataRows, 7).getValues();
+  var groups = {};
+  for (var i = 0; i < data.length; i++) {
+    if (String(data[i][1]) !== loginId) {
+      continue;
+    }
+    var sid = String(data[i][0]);
+    if (!groups[sid]) {
+      groups[sid] = { time: String(data[i][2]), rows: [] };
+    }
+    groups[sid].rows.push(i + 2);
+  }
+  var ids = Object.keys(groups);
+  ids.sort(function (a, b) {
+    return groups[b].time.localeCompare(groups[a].time);
+  });
+  if (ids.length <= maxKeep) {
+    return;
+  }
+  var toRemove = [];
+  for (var k = maxKeep; k < ids.length; k++) {
+    var g = groups[ids[k]];
+    for (var r = 0; r < g.rows.length; r++) {
+      toRemove.push(g.rows[r]);
+    }
+  }
+  toRemove.sort(function (a, b) {
+    return b - a;
+  });
+  for (var x = 0; x < toRemove.length; x++) {
+    sh.deleteRow(toRemove[x]);
+  }
+}
+
+/**
+ * @returns {{ rowIndex: number, hash: string, email: string, lastDeviceId: string } | null}
+ * rowIndex は 1 始まり（ヘッダー行=1）
+ */
+function findInvestigatorRow(sheet, loginId) {
+  var id = String(loginId || "").trim();
+  if (!id) return null;
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === id) {
+      return {
+        rowIndex: i + 1,
+        hash: String(data[i][1] || ""),
+        email: String(data[i][2] || ""),
+        lastDeviceId: String(data[i][INVEST_COL.LAST_DEVICE_ID - 1] || ""),
+        masterToken: String(data[i][INVEST_COL.MASTER_TOKEN - 1] || "")
+      };
+    }
+  }
+  return null;
+}
+
+/** masterToken を取得（無ければ新規発行＆書き込み） */
+function ensureInvestigatorMasterToken(sh, row) {
+  if (row && String(row.masterToken || "").trim()) {
+    return String(row.masterToken).trim();
+  }
+  var t = Utilities.getUuid();
+  sh.getRange(row.rowIndex, INVEST_COL.MASTER_TOKEN).setValue(t);
+  row.masterToken = t;
+  return t;
+}
+
+function setupAccount(data) {
+  var caseId = data.caseId || DEFAULT_CASE_ID;
+  var email = String(data.email || "").toLowerCase();
+  var code = String(data.code || "");
+  var loginId = String(data.loginId || "").trim();
+  var password = String(data.password || "");
+  var cfg = getCaseConfig(caseId);
+
+  if (!cfg.secretWord || code !== cfg.secretWord) {
+    return { success: false, message: "認証コードが正しくありません。" };
+  }
+  if (cfg.allowedUsers.indexOf(email) === -1) {
+    return { success: false, message: "未登録の調査員です。" };
+  }
+  if (loginId.length < 3) {
+    return { success: false, message: "ログインIDは3文字以上にしてください。" };
+  }
+  if (password.length < 8) {
+    return { success: false, message: "パスワードは8文字以上にしてください。" };
+  }
+
+  var sh = getInvestigatorsSheet();
+  if (findInvestigatorRow(sh, loginId)) {
+    return { success: false, message: "このログインIDは既に使われています。" };
+  }
+
+  var hash = hashPassword(password);
+  var now = new Date().toISOString();
+  ensureInvestigatorExtraColumns(sh);
+  var masterToken = Utilities.getUuid();
+  sh.appendRow([loginId, hash, email, now, "", "", masterToken]);
+  try {
+    upsertGameProgress(loginId, caseId, "{}");
+  } catch (gpErr) {
+    /* ベストエフォート */
+  }
+
+  return {
+    success: true,
+    message: "登録しました。",
+    email: email,
+    caseId: caseId,
+    masterToken: masterToken,
+    progress: {}
+  };
+}
+
+function buildLoginAlertEmailBody(loginId, deviceLabel) {
+  var t = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd HH:mm:ss");
+  var lines = [
+    "調査ポータルに、別の端末からログインがありました。",
+    "",
+    "ログインID: " + loginId,
+    "日時 (JST): " + t
+  ];
+  if (deviceLabel) {
+    lines.push("端末情報（ブラウザが送る識別用テキスト・参考）: " + deviceLabel);
+  }
+  lines.push("");
+  lines.push("ご本人の操作でない場合は、パスワードが第三者に知られている可能性があります。早めの変更をご検討ください。");
+  lines.push("");
+  lines.push("―― " + LOGIN_ALERT_MAIL.senderName);
+  return lines.join("\n");
+}
+
+function loginAccount(data) {
+  var loginId = String(data.loginId || "").trim();
+  var password = String(data.password || "");
+  if (!loginId || password.length < 8) {
+    return { success: false, message: "ログインIDとパスワードを確認してください。" };
+  }
+
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, loginId);
+  if (!row) {
+    return { success: false, message: "ログインIDまたはパスワードが正しくありません。" };
+  }
+  if (hashPassword(password) !== row.hash) {
+    return { success: false, message: "ログインIDまたはパスワードが正しくありません。" };
+  }
+
+  var explicitLogin = String(data.loginContext || "") === "explicit";
+  var deviceId = String(data.deviceId || "").trim();
+  var deviceLabel = String(data.deviceLabel || "").trim().slice(0, 240);
+
+  if (explicitLogin && deviceId) {
+    ensureInvestigatorExtraColumns(sh);
+    var knownCell = sh.getRange(row.rowIndex, INVEST_COL.KNOWN_DEVICE_IDS).getValue();
+    var knownIds = parseKnownDeviceIds(knownCell, row.lastDeviceId);
+    var isKnownDevice = knownIds.indexOf(deviceId) >= 0;
+    var shouldAlert = knownIds.length > 0 && !isKnownDevice;
+    if (shouldAlert) {
+      try {
+        MailApp.sendEmail({
+          to: String(row.email || "").toLowerCase(),
+          subject: LOGIN_ALERT_MAIL.subject,
+          name: LOGIN_ALERT_MAIL.senderName,
+          body: buildLoginAlertEmailBody(loginId, deviceLabel)
+        });
+      } catch (alertErr) {
+        /* ログイン自体は成功させる */
+      }
+    }
+    var nowLogin = new Date().toISOString();
+    var updatedKnown = registerKnownDeviceId(knownIds, deviceId);
+    sh.getRange(row.rowIndex, INVEST_COL.KNOWN_DEVICE_IDS).setValue(JSON.stringify(updatedKnown));
+    sh.getRange(row.rowIndex, INVEST_COL.LAST_DEVICE_ID).setValue(deviceId);
+    sh.getRange(row.rowIndex, INVEST_COL.LAST_LOGIN_AT).setValue(nowLogin);
+  }
+
+  var caseForLoad = String(data.caseId || "").trim() || DEFAULT_CASE_ID;
+  var jsonRaw = readGameProgressJsonForLogin(loginId, caseForLoad);
+  var progress = {};
+  try {
+    progress = JSON.parse(jsonRaw || "{}");
+  } catch (e) {
+    progress = {};
+  }
+
+  var cfgLogin = getCaseConfig(caseForLoad);
+  var hqBriefing = buildHqBriefingForPortal(caseForLoad, cfgLogin);
+
+  var masterToken = ensureInvestigatorMasterToken(sh, row);
+
+  return {
+    success: true,
+    message: "ログインに成功しました。",
+    email: row.email,
+    caseId: caseForLoad,
+    progressCaseId: caseForLoad,
+    progress: progress,
+    masterToken: masterToken,
+    hqBriefing: hqBriefing
+  };
+}
+
+/** 進行 JSON の最低限の妥当性（サイズ・型・未知 caseId）。完全なチート防止ではない */
+var PROGRESS_JSON_MAX_CHARS = 180000;
+
+function validateProgressPayload_(caseId, jsonStr) {
+  if (typeof jsonStr !== "string") {
+    return "進行データの形式が不正です。";
+  }
+  if (jsonStr.length > PROGRESS_JSON_MAX_CHARS) {
+    return "進行データが大きすぎます。";
+  }
+  if (!CASES[caseId]) {
+    return "未知の案件です。";
+  }
+  var obj;
+  try {
+    obj = JSON.parse(jsonStr);
+  } catch (e) {
+    return "進行データの形式が不正です。";
+  }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+    return "進行データの形式が不正です。";
+  }
+  return "";
+}
+
+function saveProgress(data) {
+  var loginId = String(data.loginId || "").trim();
+  var password = String(data.password || "");
+  var progress = data.progress;
+
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, loginId);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  if (hashPassword(password) !== row.hash) {
+    return { success: false, message: "認証に失敗しました。再ログインしてください。" };
+  }
+
+  var caseId = String(data.caseId || "").trim() || DEFAULT_CASE_ID;
+  var jsonStr =
+    typeof progress === "string"
+      ? progress
+      : JSON.stringify(progress || {});
+  var invalid = validateProgressPayload_(caseId, jsonStr);
+  if (invalid) {
+    return { success: false, message: invalid };
+  }
+  var now = new Date().toISOString();
+  upsertGameProgress(loginId, caseId, jsonStr);
+  sh.getRange(row.rowIndex, INVEST_COL.UPDATED_AT).setValue(now);
+
+  try {
+    appendProgressSnapshot(loginId, jsonStr, caseId);
+  } catch (snapErr) {
+    /* スナップショット失敗でもセーブは成功扱い */
+  }
+
+  return { success: true, message: "保存しました。" };
+}
+
+/**
+ * メール内の登録URLに email を付与（/setup で入力省略用）。base に既に ? があれば & で連結。
+ */
+function appendEmailToSetupUrl(baseUrl, normalizedEmail) {
+  if (!baseUrl) return baseUrl;
+  var sep = baseUrl.indexOf("?") >= 0 ? "&" : "?";
+  return baseUrl + sep + "email=" + encodeURIComponent(normalizedEmail);
+}
+
+/** 運営→参加者の実メール本文（ID設定URLのみ。物語は含めない） */
+function buildProviderRegistrationEmailBody(cfg, normalizedEmail) {
+  var mail = cfg.mail || {};
+  var setupUrl = mail.accountSetupUrl || "";
+  if (setupUrl) {
+    setupUrl = appendEmailToSetupUrl(setupUrl, normalizedEmail);
+  }
+  var lines = [];
+
+  var intro = mail.providerBodyLines;
+  if (intro && intro.length) {
+    for (var i = 0; i < intro.length; i++) {
+      lines.push(String(intro[i]));
+      lines.push("");
+    }
+  } else {
+    lines.push("この度は本ゲームにご参加いただき、ありがとうございます。");
+    lines.push("");
+    lines.push("ゲームのメイン画面（調査ポータル）をご利用になるには、以下のURLから調査員IDとパスワードを設定してください。");
+    lines.push("");
+  }
+
+  lines.push("――――――――――――――――――――――――");
+  lines.push("【調査員ID・パスワード設定URL】");
+  if (setupUrl) {
+    lines.push(setupUrl);
+  } else {
+    lines.push("（accountSetupUrl 未設定: CASES.mail に登録用 URL を追加してください）");
+  }
+  lines.push("――――――――――――――――――――――――");
+  lines.push("");
+  lines.push("※本メールは送信専用です。ゲーム内の物語・任務の連絡はポータル内「連絡」をご確認ください。");
+  lines.push("");
+  var footer = mail.providerFooterLine || "―― 謎解きPO 運営事務局";
+  lines.push(footer);
+  return lines.join("\n");
+}
+
+/** ゲーム内「本部」連絡本文のみ（ポータル連絡タブ。メール本文とは別） */
+function buildHqPortalBody(cfg) {
+  var mail = cfg.mail || {};
+  var lines = [];
+
+  var storyLines = mail.storyLines;
+  if (storyLines && storyLines.length) {
+    lines.push(storyLines.map(function (line) { return String(line); }).join("\n"));
+    lines.push("");
+  }
+
+  var boardUrl = String(mail.urbanLegendBoardUrl || "").trim();
+  if (boardUrl) {
+    lines.push("―――― 参照：都市伝説・奇妙な書き込みの掲示板 ――――");
+    lines.push("以下は当該地域に残る伝承スレのミラー保管先である。");
+    lines.push("");
+    /* URL 本文には出さない（ポータル側で添付リンクとして挿入し二重表示を防ぐ） */
+  }
+
+  lines.push("―― 記録班・班長");
+  return lines.join("\n");
+}
+
+/**
+ * ポータル「連絡」タブ用（ゲーム内本部）。実メールとは文面が別。
+ * id は case ごとに固定。変更時は id を変えれば再配信相当になる。
+ */
+function buildHqBriefingForPortal(caseId, cfg) {
+  var cid = String(caseId || DEFAULT_CASE_ID);
+  var mail = cfg.mail || {};
+  var boardUrl = String(mail.urbanLegendBoardUrl || "").trim();
+  var atts = [];
+  var rl = mail.requestLetterLines;
+  if (rl && rl.length) {
+    atts.push({
+      name: String(mail.requestLetterFileName || "依頼文.txt"),
+      type: "document",
+      content: rl.join("\n")
+    });
+  }
+  if (boardUrl) {
+    atts.push({ name: boardUrl, type: "link" });
+  }
+  return {
+    id: "hq-ingame-" + cid,
+    subject: mail.subject || "【本部連絡】",
+    from: mail.senderName || "本部",
+    fromRole: "班長",
+    content: buildHqPortalBody(cfg),
+    priority: "urgent",
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    attachments: atts.length ? atts : undefined
+  };
+}
+
+/**
+ * 管理者ポータル用。Script Properties に ADMIN_PORTAL_KEY を設定し、
+ * Next.js の .env.local の ADMIN_PORTAL_KEY と同一の長い秘密文字列にすること。
+ * 未設定の場合 adminListProgress は常に失敗する。
+ */
+function getAdminPortalKey() {
+  return String(PropertiesService.getScriptProperties().getProperty("ADMIN_PORTAL_KEY") || "").trim();
+}
+
+function summarizeProgressForAdmin(jsonStr) {
+  var o = {};
+  try {
+    o = JSON.parse(String(jsonStr || "{}"));
+  } catch (e) {
+    return { parseError: true, rawPreview: String(jsonStr || "").substring(0, 400) };
+  }
+
+  var tasks = o.tasks || [];
+  var tBrief = [];
+  for (var ti = 0; ti < tasks.length; ti++) {
+    var t = tasks[ti];
+    tBrief.push({
+      id: String(t.id || ""),
+      templateId: String(t.templateId || ""),
+      title: String(t.title || ""),
+      status: String(t.status || ""),
+      groupTitle: String(t.groupTitle || ""),
+      completionType: String(t.completionType || "")
+    });
+  }
+
+  var arch = [];
+  var items = o.archiveItems || [];
+  for (var ai = 0; ai < items.length; ai++) {
+    var a = items[ai];
+    var thumb = a.thumbnail;
+    var thumbOut = thumb;
+    if (thumb != null && String(thumb).length > 120) {
+      thumbOut = "[画像データ省略 " + String(thumb).length + " 文字]";
+    }
+    var desc = String(a.description || "");
+    arch.push({
+      id: String(a.id || ""),
+      type: String(a.type || ""),
+      title: String(a.title || ""),
+      descriptionPreview: desc.substring(0, 500),
+      thumbnail: thumbOut
+    });
+  }
+
+  var memos = o.memos || [];
+  var memoBrief = [];
+  for (var mi = 0; mi < memos.length; mi++) {
+    var m = memos[mi];
+    memoBrief.push({
+      id: String(m.id || ""),
+      title: String(m.title || ""),
+      contentPreview: String(m.content || "").substring(0, 400)
+    });
+  }
+
+  var ach = o.achievements || [];
+  var achBrief = [];
+  for (var hi = 0; hi < ach.length; hi++) {
+    var h = ach[hi];
+    achBrief.push({
+      id: String(h.id || ""),
+      title: String(h.title || ""),
+      rarity: String(h.rarity || "")
+    });
+  }
+
+  var comm = o.communications || [];
+  var commBrief = [];
+  for (var ci = 0; ci < comm.length; ci++) {
+    var c = comm[ci];
+    commBrief.push({
+      id: String(c.id || ""),
+      subject: String(c.subject || ""),
+      from: String(c.from || ""),
+      isRead: !!c.isRead
+    });
+  }
+
+  return {
+    activeTab: o.activeTab != null ? String(o.activeTab) : "",
+    tasks: tBrief,
+    archiveItems: arch,
+    memos: memoBrief,
+    achievements: achBrief,
+    communications: commBrief,
+    counts: {
+      tasks: tasks.length,
+      archiveItems: items.length,
+      memos: memos.length,
+      achievements: ach.length,
+      communications: comm.length
+    }
+  };
+}
+
+function adminListProgress(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+
+  var sh = getInvestigatorsSheet();
+  var values = sh.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < values.length; i++) {
+    var r = values[i];
+    rows.push({
+      loginId: String(r[0] || ""),
+      email: String(r[2] || ""),
+      updatedAt: String(r[INVEST_COL.UPDATED_AT - 1] || ""),
+      lastDeviceId: String(r[INVEST_COL.LAST_DEVICE_ID - 1] || ""),
+      lastLoginAt: String(r[INVEST_COL.LAST_LOGIN_AT - 1] || "")
+    });
+  }
+  var gameProgress = [];
+  try {
+    gameProgress = buildGameProgressListForAdmin();
+  } catch (gpListErr) {
+    gameProgress = [];
+  }
+  return { success: true, investigators: rows, gameProgress: gameProgress };
+}
+
+/** 管理者: 1 名分の progress_json 全文（開発ツール・バックアップ用） */
+function adminGetProgress(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var targetLogin = String(data.targetLoginId || "").trim();
+  if (!targetLogin) {
+    return { success: false, message: "targetLoginId が空です。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, targetLogin);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  var caseId = String(data.targetCaseId || "").trim() || DEFAULT_CASE_ID;
+  var jsonRaw = readGameProgressJsonForLogin(targetLogin, caseId);
+  var progress = {};
+  try {
+    progress = JSON.parse(jsonRaw || "{}");
+  } catch (e) {
+    progress = {};
+  }
+  return {
+    success: true,
+    loginId: targetLogin,
+    caseId: caseId,
+    progress: progress
+  };
+}
+
+/** 管理者: progress_json を上書き（開発ツール・復元用。プレイヤーのパスワード不要） */
+function adminSetProgress(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var targetLogin = String(data.targetLoginId || "").trim();
+  if (!targetLogin) {
+    return { success: false, message: "targetLoginId が空です。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, targetLogin);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  var caseId = String(data.targetCaseId || "").trim() || DEFAULT_CASE_ID;
+  var progress = data.progress;
+  var jsonStr =
+    typeof progress === "string"
+      ? progress
+      : JSON.stringify(progress || {});
+  var invalidAdmin = validateProgressPayload_(caseId, jsonStr);
+  if (invalidAdmin) {
+    return { success: false, message: invalidAdmin };
+  }
+  var now = new Date().toISOString();
+  upsertGameProgress(targetLogin, caseId, jsonStr);
+  sh.getRange(row.rowIndex, INVEST_COL.UPDATED_AT).setValue(now);
+
+  try {
+    appendProgressSnapshot(targetLogin, jsonStr, caseId);
+  } catch (snapErr2) {
+    /* ignore */
+  }
+
+  return { success: true, message: "進行データを更新しました。", appliedCaseId: caseId };
+}
+
+/** 管理者: login_id 別のスナップショット一覧（新しい順） */
+function adminListProgressSnapshots(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var targetLogin = String(data.targetLoginId || "").trim();
+  if (!targetLogin) {
+    return { success: false, message: "targetLoginId が空です。" };
+  }
+  var limit = parseInt(data.limit, 10);
+  if (isNaN(limit) || limit < 1) {
+    limit = 50;
+  }
+  var sh = getProgressSnapshotsSheet();
+  var lrSnap = sh.getLastRow();
+  if (lrSnap < 2) {
+    return { success: true, snapshots: [] };
+  }
+  var vals = sh.getRange(2, 1, lrSnap - 1, 7).getValues();
+  var groups = {};
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][1]) !== targetLogin) {
+      continue;
+    }
+    var sid = String(vals[i][0]);
+    var t = String(vals[i][2]);
+    var total = Number(vals[i][4]);
+    var caseSnap = vals[i].length > 6 ? String(vals[i][6] || "") : "";
+    if (!groups[sid]) {
+      groups[sid] = {
+        snapshotId: sid,
+        createdAt: t,
+        chunkTotal: total,
+        byteSize: 0,
+        caseId: caseSnap
+      };
+    }
+    groups[sid].byteSize += String(vals[i][5]).length;
+  }
+  var list = [];
+  for (var k in groups) {
+    if (groups.hasOwnProperty(k)) {
+      list.push(groups[k]);
+    }
+  }
+  list.sort(function (a, b) {
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+  if (list.length > limit) {
+    list = list.slice(0, limit);
+  }
+  return { success: true, snapshots: list };
+}
+
+/** 管理者: スナップショットをそのまま progress_json に復元（メモ・写真・キーワード含む完全一致） */
+function adminRestoreProgressSnapshot(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var targetLogin = String(data.targetLoginId || "").trim();
+  var snapshotId = String(data.snapshotId || "").trim();
+  if (!targetLogin || !snapshotId) {
+    return { success: false, message: "targetLoginId または snapshotId が空です。" };
+  }
+  var sh = getProgressSnapshotsSheet();
+  var lr = sh.getLastRow();
+  if (lr < 2) {
+    return { success: false, message: "スナップショットシートが空です。" };
+  }
+  var vals = sh.getRange(2, 1, lr - 1, 7).getValues();
+  var chunks = [];
+  var total = -1;
+  var restoredCaseId = "";
+  for (var i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) !== snapshotId || String(vals[i][1]) !== targetLogin) {
+      continue;
+    }
+    if (!restoredCaseId && vals[i].length > 6) {
+      restoredCaseId = String(vals[i][6] || "");
+    }
+    var idx = Number(vals[i][3]);
+    total = Number(vals[i][4]);
+    chunks.push({ idx: idx, text: String(vals[i][5]) });
+  }
+  if (chunks.length === 0) {
+    return { success: false, message: "該当スナップショットが見つかりません。" };
+  }
+  chunks.sort(function (a, b) {
+    return a.idx - b.idx;
+  });
+  if (total < 1 || chunks.length !== total) {
+    return { success: false, message: "スナップショットのチャンクが欠けています。" };
+  }
+  for (var j = 0; j < total; j++) {
+    if (chunks[j].idx !== j) {
+      return { success: false, message: "スナップショットのチャンク順が不正です。" };
+    }
+  }
+  var jsonStr = "";
+  for (var m = 0; m < chunks.length; m++) {
+    jsonStr += chunks[m].text;
+  }
+  var parsed;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch (pe) {
+    return { success: false, message: "スナップショットの JSON が壊れています。" };
+  }
+  var shInv = getInvestigatorsSheet();
+  var invRow = findInvestigatorRow(shInv, targetLogin);
+  var caseForRestore = restoredCaseId || (invRow ? invRow.caseId : "");
+  return adminSetProgress({
+    adminKey: data.adminKey,
+    targetLoginId: targetLogin,
+    targetCaseId: caseForRestore,
+    progress: parsed
+  });
+}
+
+/** 管理者: 現在シートの progress を履歴に 1 件追加（手動ブックマーク） */
+function adminCaptureProgressSnapshot(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var targetLogin = String(data.targetLoginId || "").trim();
+  if (!targetLogin) {
+    return { success: false, message: "targetLoginId が空です。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, targetLogin);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  var caseId = String(data.targetCaseId || "").trim() || DEFAULT_CASE_ID;
+  var gp = findGameProgressRow(getGameProgressSheet(), targetLogin, caseId);
+  var jsonStr = gp ? String(gp.progressJson || "{}") : "{}";
+  try {
+    appendProgressSnapshot(targetLogin, jsonStr, caseId);
+  } catch (e) {
+    return { success: false, message: "スナップショットの保存に失敗しました。" };
+  }
+  return { success: true, message: "現在の状態をスナップショットに追加しました。", caseId: caseId };
+}
+
+/** 設定変更・初期化のセキュリティ通知（運営事務局） */
+var ACCOUNT_SECURITY_MAIL = {
+  subject: "【謎解きPO】アカウント情報の変更通知",
+  senderName: "謎解きPO 運営事務局"
+};
+
+function sendAccountSecurityEmail(toEmail, changeDescriptionLines) {
+  var email = String(toEmail || "").trim().toLowerCase();
+  if (!email || email.indexOf("@") < 0) {
+    return;
+  }
+  var lines = [
+    "調査員各位",
+    "",
+    "あなたの調査員アカウントに変更が行われました。",
+    ""
+  ];
+  var desc = changeDescriptionLines || [];
+  for (var i = 0; i < desc.length; i++) {
+    lines.push(String(desc[i]));
+  }
+  lines.push(
+    "",
+    "心当たりがない場合は、第三者による不正な操作の可能性があります。",
+    "速やかに運営事務局までご連絡ください。",
+    "",
+    "―― " + ACCOUNT_SECURITY_MAIL.senderName
+  );
+  MailApp.sendEmail({
+    to: email,
+    subject: ACCOUNT_SECURITY_MAIL.subject,
+    name: ACCOUNT_SECURITY_MAIL.senderName,
+    body: lines.join("\n")
+  });
+}
+
+function changeLoginId(data) {
+  var currentId = String(data.loginId || "").trim();
+  var pw = String(data.password || "");
+  var newId = String(data.newLoginId || "").trim();
+  if (newId.length < 3) {
+    return { success: false, message: "新しいログインIDは3文字以上にしてください。" };
+  }
+  if (newId === currentId) {
+    return { success: false, message: "現在と同じIDです。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, currentId);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  if (hashPassword(pw) !== row.hash) {
+    return { success: false, message: "パスワードが正しくありません。" };
+  }
+  if (findInvestigatorRow(sh, newId)) {
+    return { success: false, message: "このログインIDは既に使用されています。" };
+  }
+  sh.getRange(row.rowIndex, INVEST_COL.LOGIN_ID).setValue(newId);
+  sh.getRange(row.rowIndex, INVEST_COL.UPDATED_AT).setValue(new Date().toISOString());
+  try {
+    migrateLoginIdInAuxiliarySheets(currentId, newId);
+  } catch (auxErr) {
+    /* ベストエフォート */
+  }
+  try {
+    sendAccountSecurityEmail(row.email, [
+      "変更内容: ログインID",
+      "変更前: " + currentId,
+      "変更後: " + newId
+    ]);
+  } catch (mailErr) {
+    /* 変更は確定済み */
+  }
+  return { success: true, message: "ログインIDを変更しました。", newLoginId: newId };
+}
+
+function changeAccountEmail(data) {
+  var currentId = String(data.loginId || "").trim();
+  var pw = String(data.password || "");
+  var newEmail = String(data.newEmail || "").trim().toLowerCase();
+  if (!newEmail || newEmail.indexOf("@") < 0) {
+    return { success: false, message: "メールアドレスの形式が正しくありません。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, currentId);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  if (hashPassword(pw) !== row.hash) {
+    return { success: false, message: "パスワードが正しくありません。" };
+  }
+  var oldEmail = String(row.email || "").toLowerCase();
+  if (newEmail === oldEmail) {
+    return { success: false, message: "現在と同じメールアドレスです。" };
+  }
+  var cfg = getCaseConfig(String(data.caseId || "").trim() || DEFAULT_CASE_ID);
+  if (cfg.allowedUsers && cfg.allowedUsers.indexOf(newEmail) === -1) {
+    return { success: false, message: "このメールアドレスは案件の許可リストに含まれていません。" };
+  }
+  sh.getRange(row.rowIndex, INVEST_COL.EMAIL).setValue(newEmail);
+  sh.getRange(row.rowIndex, INVEST_COL.UPDATED_AT).setValue(new Date().toISOString());
+  try {
+    sendAccountSecurityEmail(oldEmail, [
+      "変更内容: 登録メールアドレス",
+      "変更前: " + oldEmail,
+      "変更後: " + newEmail
+    ]);
+    sendAccountSecurityEmail(newEmail, [
+      "変更内容: 登録メールアドレス",
+      "このアドレスが調査員登録メールとして設定されました。",
+      "以前のアドレス: " + oldEmail
+    ]);
+  } catch (e) {
+    /* ignore */
+  }
+  return { success: true, message: "メールアドレスを変更しました。", newEmail: newEmail };
+}
+
+function changeAccountPassword(data) {
+  var currentId = String(data.loginId || "").trim();
+  var pw = String(data.password || "");
+  var newPw = String(data.newPassword || "");
+  if (newPw.length < 8) {
+    return { success: false, message: "新しいパスワードは8文字以上にしてください。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, currentId);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  if (hashPassword(pw) !== row.hash) {
+    return { success: false, message: "現在のパスワードが正しくありません。" };
+  }
+  var newHash = hashPassword(newPw);
+  sh.getRange(row.rowIndex, INVEST_COL.PASSWORD_HASH).setValue(newHash);
+  sh.getRange(row.rowIndex, INVEST_COL.UPDATED_AT).setValue(new Date().toISOString());
+  try {
+    sendAccountSecurityEmail(row.email, [
+      "変更内容: パスワード",
+      "ログインID: " + currentId,
+      "パスワードが変更されました。"
+    ]);
+  } catch (e) {
+    /* ignore */
+  }
+  return { success: true, message: "パスワードを変更しました。" };
+}
+
+/** 調査データを空に。直前の JSON は ProgressSnapshots に残す（運営・開発者向けバックアップ） */
+function resetInvestigatorProgress(data) {
+  var loginId = String(data.loginId || "").trim();
+  var password = String(data.password || "");
+  var confirmLoginId = String(data.confirmLoginId || "").trim();
+  if (confirmLoginId !== loginId) {
+    return { success: false, message: "確認のため、調査員IDが一致しません。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, loginId);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  if (hashPassword(password) !== row.hash) {
+    return { success: false, message: "パスワードが正しくありません。" };
+  }
+  var caseId = String(data.caseId || "").trim() || DEFAULT_CASE_ID;
+  var gp = findGameProgressRow(getGameProgressSheet(), loginId, caseId);
+  var jsonStr = gp ? String(gp.progressJson || "{}") : "{}";
+  try {
+    appendProgressSnapshot(loginId, jsonStr, caseId);
+  } catch (e) {
+    /* ignore */
+  }
+  var empty = "{}";
+  upsertGameProgress(loginId, caseId, empty);
+  sh.getRange(row.rowIndex, INVEST_COL.UPDATED_AT).setValue(new Date().toISOString());
+  try {
+    appendProgressSnapshot(loginId, empty, caseId);
+  } catch (e2) {
+    /* ignore */
+  }
+  try {
+    sendAccountSecurityEmail(row.email, [
+      "変更内容: 調査データの初期化",
+      "ポータル上の進行データ（任務・メモ・アーカイブ等）がすべて削除されました。",
+      "復元を希望される場合は運営事務局までご連絡ください。スナップショット履歴にバックアップが残る場合があります。"
+    ]);
+  } catch (e3) {
+    /* ignore */
+  }
+  return { success: true, message: "データを初期化しました。", progress: {} };
+}
+
+function adminEnsureGameProgressSlot(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var targetLogin = String(data.targetLoginId || "").trim();
+  var caseId = String(data.caseId || "").trim();
+  if (!targetLogin || !caseId) {
+    return { success: false, message: "targetLoginId と caseId が必要です。" };
+  }
+  var sh = getInvestigatorsSheet();
+  var row = findInvestigatorRow(sh, targetLogin);
+  if (!row) {
+    return { success: false, message: "調査員が見つかりません。" };
+  }
+  var gp = findGameProgressRow(getGameProgressSheet(), targetLogin, caseId);
+  if (gp) {
+    return { success: true, message: "この案件の枠は既にあります。", existed: true };
+  }
+  upsertGameProgress(targetLogin, caseId, "{}");
+  return { success: true, message: "案件の進行枠を追加しました。", existed: false };
+}
+
+function adminListOfficialCredentials(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var sh = getOfficialCredentialsSheet();
+  var vals = sh.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < vals.length; i++) {
+    rows.push({
+      loginId: String(vals[i][0] || ""),
+      resourceKey: String(vals[i][1] || ""),
+      label: String(vals[i][2] || ""),
+      url: String(vals[i][3] || ""),
+      username: String(vals[i][4] || ""),
+      password: String(vals[i][5] || ""),
+      notes: String(vals[i][6] || ""),
+      updatedAt: String(vals[i][7] || "")
+    });
+  }
+  return { success: true, credentials: rows };
+}
+
+function adminUpsertOfficialCredential(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var loginId = String(data.loginId || "").trim();
+  var resourceKey = String(data.resourceKey || "").trim();
+  if (!loginId || !resourceKey) {
+    return { success: false, message: "loginId と resourceKey が必要です。" };
+  }
+  var label = String(data.label || "");
+  var url = String(data.url || "");
+  var username = String(data.username || "");
+  var password = String(data.password || "");
+  var notes = String(data.notes || "");
+  var now = new Date().toISOString();
+  var sh = getOfficialCredentialsSheet();
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]).trim() === loginId && String(vals[i][1]).trim() === resourceKey) {
+      sh.getRange(i + 1, OC_COL.LABEL).setValue(label);
+      sh.getRange(i + 1, OC_COL.URL).setValue(url);
+      sh.getRange(i + 1, OC_COL.USERNAME).setValue(username);
+      sh.getRange(i + 1, OC_COL.PASSWORD).setValue(password);
+      sh.getRange(i + 1, OC_COL.NOTES).setValue(notes);
+      sh.getRange(i + 1, OC_COL.UPDATED_AT).setValue(now);
+      return { success: true, message: "保存しました。" };
+    }
+  }
+  sh.appendRow([loginId, resourceKey, label, url, username, password, notes, now]);
+  return { success: true, message: "追加しました。" };
+}
+
+function adminDeleteOfficialCredential(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var loginId = String(data.loginId || "").trim();
+  var resourceKey = String(data.resourceKey || "").trim();
+  if (!loginId || !resourceKey) {
+    return { success: false, message: "loginId と resourceKey が必要です。" };
+  }
+  var sh = getOfficialCredentialsSheet();
+  var vals = sh.getDataRange().getValues();
+  for (var j = 1; j < vals.length; j++) {
+    if (String(vals[j][0]).trim() === loginId && String(vals[j][1]).trim() === resourceKey) {
+      sh.deleteRow(j + 1);
+      return { success: true, message: "削除しました。" };
+    }
+  }
+  return { success: false, message: "該当行が見つかりません。" };
+}
+
+/**
+ * シートに書き込むアクションの一覧。並行リクエストによる
+ * 「読み取り→書き戻し」の上書き競合を防ぐため、スクリプトロックの中で実行する。
+ */
+var MUTATING_ACTIONS = {
+  setupAccount: true,
+  loginAccount: true,
+  saveProgress: true,
+  changeLoginId: true,
+  changeAccountEmail: true,
+  changeAccountPassword: true,
+  resetInvestigatorProgress: true,
+  grantCaseAccess: true,
+  issueAccessToken: true,
+  validateAccessToken: true,
+  adminSetProgress: true,
+  adminRestoreProgressSnapshot: true,
+  adminCaptureProgressSnapshot: true,
+  adminSetWorksCatalog: true,
+  adminSetNews: true,
+  adminEnsureGameProgressSlot: true,
+  adminUpsertOfficialCredential: true,
+  adminDeleteOfficialCredential: true
+};
+
+/** スクリプトロックを取得して fn を実行（最大20秒待ち。取れなければ例外→doPost がエラー応答） */
+function withScriptLock_(fn) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function routeAction_(data) {
+  if (data.action === "auth") {
+    return verifyAndSend(data);
+  } else if (data.action === "checkCode") {
+    return checkCodeOnly(data);
+  } else if (data.action === "setupAccount") {
+    return setupAccount(data);
+  } else if (data.action === "loginAccount") {
+    return loginAccount(data);
+  } else if (data.action === "saveProgress") {
+    return saveProgress(data);
+  } else if (data.action === "resolveKeywordRoute") {
+    return resolveKeywordRoute(data);
+  } else if (data.action === "adminListProgress") {
+    return adminListProgress(data);
+  } else if (data.action === "adminGetProgress") {
+    return adminGetProgress(data);
+  } else if (data.action === "adminSetProgress") {
+    return adminSetProgress(data);
+  } else if (data.action === "adminListProgressSnapshots") {
+    return adminListProgressSnapshots(data);
+  } else if (data.action === "adminRestoreProgressSnapshot") {
+    return adminRestoreProgressSnapshot(data);
+  } else if (data.action === "adminCaptureProgressSnapshot") {
+    return adminCaptureProgressSnapshot(data);
+  } else if (data.action === "publicGetWorksCatalog") {
+    return publicGetWorksCatalog();
+  } else if (data.action === "adminGetWorksCatalog") {
+    return adminGetWorksCatalog(data);
+  } else if (data.action === "adminSetWorksCatalog") {
+    return adminSetWorksCatalog(data);
+  } else if (data.action === "publicGetNews") {
+    return publicGetNews();
+  } else if (data.action === "adminGetNews") {
+    return adminGetNews(data);
+  } else if (data.action === "adminSetNews") {
+    return adminSetNews(data);
+  } else if (data.action === "adminEnsureGameProgressSlot") {
+    return adminEnsureGameProgressSlot(data);
+  } else if (data.action === "adminListOfficialCredentials") {
+    return adminListOfficialCredentials(data);
+  } else if (data.action === "adminUpsertOfficialCredential") {
+    return adminUpsertOfficialCredential(data);
+  } else if (data.action === "adminDeleteOfficialCredential") {
+    return adminDeleteOfficialCredential(data);
+  } else if (data.action === "changeLoginId") {
+    return changeLoginId(data);
+  } else if (data.action === "changeAccountEmail") {
+    return changeAccountEmail(data);
+  } else if (data.action === "changeAccountPassword") {
+    return changeAccountPassword(data);
+  } else if (data.action === "resetInvestigatorProgress") {
+    return resetInvestigatorProgress(data);
+  } else if (data.action === "grantCaseAccess") {
+    return grantCaseAccess(data);
+  } else if (data.action === "validateEntitlement") {
+    return validateEntitlement(data);
+  } else if (data.action === "verifyMasterToken") {
+    return verifyMasterToken(data);
+  } else if (data.action === "issueAccessToken") {
+    return issueAccessToken(data);
+  } else if (data.action === "validateAccessToken") {
+    return validateAccessToken(data);
+  }
+  /* saveMemo / getMemos は無認証でシートを読み書きできたため廃止（旧 legacy-static 専用だった） */
+  return { success: false, message: "不正なリクエストです。" };
+}
+
+function doPost(e) {
+  try {
+    var raw = "{}";
+    if (e && e.postData && typeof e.postData.contents === "string") {
+      raw = e.postData.contents;
+    }
+    var data = {};
+    try {
+      data = JSON.parse(raw);
+    } catch (parseErr) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ success: false, message: "JSON の解析に失敗しました。" })
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    var result;
+    if (MUTATING_ACTIONS[String(data.action || "")]) {
+      result = withScriptLock_(function () {
+        return routeAction_(data);
+      });
+    } else {
+      result = routeAction_(data);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    var msg = err && err.message ? String(err.message) : String(err);
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        success: false,
+        message: "GAS 内部エラー: " + msg + "（スプレッドシートに紐づいているか、実行ログを確認）"
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function verifyAndSend(data) {
+  var caseId = data.caseId;
+  var code = data.code;
+  var email = data.email;
+  var cfg = getCaseConfig(caseId);
+  var normalizedEmail = String(email || "").toLowerCase();
+
+  if (!cfg.secretWord || String(code || "") !== cfg.secretWord) {
+    return { success: false, message: "認証コードが正しくありません。解析を続行してください。" };
+  }
+
+  if (cfg.allowedUsers.indexOf(normalizedEmail) === -1) {
+    return { success: false, message: "未登録の調査員です。アクセスは拒絶されました。" };
+  }
+
+  try {
+    var mail = cfg.mail || {};
+    var provSub = mail.providerSubject || "【謎解き】調査員IDの設定について";
+    var provName = mail.providerSenderName || "運営事務局";
+    MailApp.sendEmail({
+      to: normalizedEmail,
+      subject: provSub,
+      name: provName,
+      body: buildProviderRegistrationEmailBody(cfg, normalizedEmail)
+    });
+    return { success: true, message: "承認されました。メールを確認してください。" };
+  } catch (e) {
+    return { success: false, message: "メール送信に失敗しました。" };
+  }
+}
+
+function checkCodeOnly(data) {
+  var caseId = data.caseId;
+  var code = data.code;
+  var cfg = getCaseConfig(caseId);
+
+  if (!cfg.secretWord || String(code || "") !== cfg.secretWord) {
+    return { success: false, message: "認証コードが正しくありません。解析を続行してください。" };
+  }
+  return { success: true, message: "合言葉が確認されました。" };
+}
+
+function resolveKeywordRoute(data) {
+  var caseId = data.caseId;
+  var keyword = data.keyword;
+  var cfg = getCaseConfig(caseId);
+  var key = String(keyword || "").trim();
+
+  if (!key) {
+    return { success: false, message: "キーワード未入力です。" };
+  }
+
+  var nextUrl = cfg.keywordRoutes[key];
+  if (!nextUrl) {
+    return { success: false, message: "該当ルートが見つかりません。" };
+  }
+
+  return { success: true, nextUrl: nextUrl };
+}
+
+/*
+ * saveMemo / getMemos は廃止。
+ * 無認証で任意のシート読み書きができてしまうため、doPost のルーティングから外した。
+ * （利用していたのは旧 legacy-static のみ。現行ポータルのメモはローカル進行データに保存される）
+ */

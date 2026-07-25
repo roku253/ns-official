@@ -1,59 +1,66 @@
 /**
- * NS Official CMS — Apps Script 貼り付け用断片
+ * NS Official CMS — お知らせ（断片リファレンス）
  *
- * 既存の doPost ルーティングに以下を追加し、NSPlatform シート（または同等）に
- * `news` 列／プロパティを保持してください。works_catalog は既存の get/set を
- * JSON 丸ごと透過保存すれば詳細フィールド（detail 等）も保持されます。
- *
- * 必要なアクション:
- *   - publicGetNews
- *   - adminGetNews
- *   - adminSetNews
- *
- * 既存のまま透過でよいもの:
- *   - publicGetWorksCatalog / adminGetWorksCatalog / adminSetWorksCatalog
+ * フル統合済み本体は gas/コード.gs。
+ * NSPlatform シートの key/value に works_catalog と同様に news を保存する。
+ * このファイルは参照用断片。本番は gas/コード.gs を GAS エディタへ丸ごと反映すること。
  */
 
-// --- 例: プロパティサービスに news JSON を置く簡易実装 ---
-// 本番ではスプレッドシートの NSPlatform!news セル等に合わせて読み書きしてください。
+var NS_PLATFORM_KEY_NEWS = "news";
 
-function cmsReadNews_() {
-  const raw = PropertiesService.getScriptProperties().getProperty("NS_OFFICIAL_NEWS")
-  if (!raw) {
-    return { items: [] }
+function publicGetNews() {
+  var raw = readPlatformKeyValue(NS_PLATFORM_KEY_NEWS);
+  var news = { items: [] };
+  if (raw) {
+    try {
+      news = JSON.parse(raw);
+    } catch (e) {
+      news = { items: [] };
+    }
   }
-  try {
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === "object") return parsed
-  } catch (e) {
-    /* ignore */
-  }
-  return { items: [] }
+  if (!news || typeof news !== "object") news = { items: [] };
+  if (!Array.isArray(news.items)) news.items = [];
+  return { success: true, news: news };
 }
 
-function cmsWriteNews_(news) {
-  const payload = news && typeof news === "object" ? news : { items: [] }
-  payload.updatedAt = new Date().toISOString()
-  PropertiesService.getScriptProperties().setProperty("NS_OFFICIAL_NEWS", JSON.stringify(payload))
-  return payload
+function adminGetNews(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  return publicGetNews();
 }
 
-/**
- * doPost 内の switch / if チェーンに組み込む例:
+function adminSetNews(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  if (!expected) {
+    return { success: false, message: "GAS に ADMIN_PORTAL_KEY（Script Properties）が未設定です。" };
+  }
+  if (key !== expected) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var news = data.news;
+  if (!news || typeof news !== "object") news = { items: [] };
+  if (!Array.isArray(news.items)) news.items = [];
+  news.updatedAt = new Date().toISOString();
+  writePlatformKeyValue(NS_PLATFORM_KEY_NEWS, JSON.stringify(news));
+  return { success: true, news: news, message: "お知らせを保存しました。" };
+}
+
+/*
+ * --- MUTATING_ACTIONS に追加 ---
+ *   adminSetNews: true,
  *
- *   if (action === "publicGetNews") {
- *     return json_({ success: true, news: cmsReadNews_() });
- *   }
- *   if (action === "adminGetNews") {
- *     assertAdmin_(body.adminKey);
- *     return json_({ success: true, news: cmsReadNews_() });
- *   }
- *   if (action === "adminSetNews") {
- *     assertAdmin_(body.adminKey);
- *     const saved = cmsWriteNews_(body.news);
- *     return json_({ success: true, news: saved, message: "保存しました。" });
- *   }
- *
- * publicGetNews は published === false の項目を落としてもよいが、
- * 公式サイト側でもフィルタするため、そのまま返しても問題ない。
+ * --- routeAction_ に追加（adminSetWorksCatalog の近くが分かりやすい）---
+ *   } else if (data.action === "publicGetNews") {
+ *     return publicGetNews();
+ *   } else if (data.action === "adminGetNews") {
+ *     return adminGetNews(data);
+ *   } else if (data.action === "adminSetNews") {
+ *     return adminSetNews(data);
  */

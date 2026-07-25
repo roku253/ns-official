@@ -1,15 +1,32 @@
 "use client"
 
-import { Suspense } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { OfficialLoadingScreen } from "@/components/official-site/official-loading-screen"
 import { OfficialSiteHeader } from "@/components/official-site/official-site-header"
 import { OfficialSitePortalFooter } from "@/components/official-site/official-site-portal-footer"
-import { formatNewsDate, getNewsItems } from "@/lib/official/news"
+import { fetchPublishedNewsItems } from "@/lib/official/fetch-public-news"
+import { formatNewsDate, getNewsItems, type NewsItem } from "@/lib/official/news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 
 function NewsMain() {
-  const items = getNewsItems()
+  const [items, setItems] = useState<NewsItem[]>(() => getNewsItems())
+  const [loadingNews, setLoadingNews] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const next = await fetchPublishedNewsItems()
+      if (!cancelled) {
+        setItems(next)
+        setLoadingNews(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <>
       <main className="flex-1 font-official-sans-jp">
@@ -22,7 +39,9 @@ function NewsMain() {
           </h1>
 
           <div className="mt-12 space-y-10">
-            {items.length === 0 ? (
+            {loadingNews && items.length === 0 ? (
+              <p className="text-sm leading-[2] text-zinc-500">読み込み中…</p>
+            ) : items.length === 0 ? (
               <p className="text-sm leading-[2] text-zinc-500">
                 現在、掲載中のお知らせはありません。
               </p>

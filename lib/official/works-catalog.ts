@@ -66,6 +66,9 @@ export type GasStoryEntry = {
   title?: string
   tagline?: string
   subtitle?: string
+  status?: string
+  coverImage?: string
+  detail?: WorkDetailRecord
 }
 
 export type GasWorkEntry = {
@@ -80,8 +83,11 @@ export type GasWorksCatalog = {
   published?: string[] | null
   /** トップ「おすすめ」枠に使う story id（グローバル） */
   featuredId?: string | null
-  /** レガシー: story id ごとの表示名上書き */
-  overrides?: Record<string, { title?: string; tagline?: string; subtitle?: string }> | null
+  /** レガシー: story id ごとの表示名上書き（詳細は works.stories 側を正） */
+  overrides?: Record<
+    string,
+    { title?: string; tagline?: string; subtitle?: string; status?: string; coverImage?: string; detail?: WorkDetailRecord }
+  > | null
 }
 
 export type MergedWorkItem = WorkStoryRecord & {
@@ -104,7 +110,14 @@ export function gasCatalogUsesNestedWorks(catalog: GasWorksCatalog | null | unde
 function displayOverridesForStory(
   gasCatalog: GasWorksCatalog | null | undefined,
   s: WorkStoryRecord
-): { title?: string; tagline?: string; subtitle?: string } {
+): {
+  title?: string
+  tagline?: string
+  subtitle?: string
+  status?: string
+  coverImage?: string
+  detail?: WorkDetailRecord
+} {
   const top = gasCatalog?.overrides?.[s.id] || {}
   const wk = workKeyFromStoryRecord(s)
   const nest = gasCatalog?.works?.[wk]?.stories?.[s.id]
@@ -112,12 +125,81 @@ function displayOverridesForStory(
     title: nest?.title,
     tagline: nest?.tagline,
     subtitle: nest?.subtitle,
+    status: nest?.status,
+    coverImage: nest?.coverImage,
+    detail: nest?.detail,
   }
+  const strings = Object.fromEntries(
+    Object.entries({
+      title: fromNest.title ?? top.title,
+      tagline: fromNest.tagline ?? top.tagline,
+      subtitle: fromNest.subtitle ?? top.subtitle,
+      status: fromNest.status ?? top.status,
+      coverImage: fromNest.coverImage ?? top.coverImage,
+    }).filter(([, v]) => typeof v === "string" && v.trim().length > 0)
+  ) as {
+    title?: string
+    tagline?: string
+    subtitle?: string
+    status?: string
+    coverImage?: string
+  }
+  const detail = mergeWorkDetail(s.detail, fromNest.detail ?? top.detail)
+  return { ...strings, detail }
+}
+
+/** GAS 上書きを静的 detail に重ねる。配列・数値は上書き側が定義されていれば置換 */
+export function mergeWorkDetail(
+  base: WorkDetailRecord | undefined,
+  override: WorkDetailRecord | undefined | null
+): WorkDetailRecord | undefined {
+  if (!override || typeof override !== "object") return base
+  const next: WorkDetailRecord = { ...(base || {}) }
+  if (typeof override.estimatedPlayMinutes === "number") {
+    next.estimatedPlayMinutes = override.estimatedPlayMinutes
+  }
+  if (typeof override.estimatedPlayMinutesMin === "number") {
+    next.estimatedPlayMinutesMin = override.estimatedPlayMinutesMin
+  }
+  if (typeof override.estimatedPlayMinutesMax === "number") {
+    next.estimatedPlayMinutesMax = override.estimatedPlayMinutesMax
+  }
+  if (Array.isArray(override.genres)) {
+    next.genres = override.genres.map((g) => String(g)).filter((g) => g.trim().length > 0)
+  }
+  if (Array.isArray(override.longDescription)) {
+    next.longDescription = override.longDescription.map((p) => String(p)).filter((p) => p.trim().length > 0)
+  }
+  if (Array.isArray(override.screenshots)) {
+    next.screenshots = override.screenshots
+      .map((shot) => {
+        if (!shot || typeof shot !== "object") return null
+        const src = typeof shot.src === "string" ? shot.src.trim() : ""
+        if (!src) return null
+        const alt = typeof shot.alt === "string" ? shot.alt.trim() : undefined
+        return alt ? { src, alt } : { src }
+      })
+      .filter((x): x is { src: string; alt?: string } => x != null)
+  }
+  return next
+}
+
+function applyStoryOverridesToRecord(
+  s: WorkStoryRecord,
+  gasCatalog: GasWorksCatalog | null | undefined
+): MergedWorkItem {
+  const o = displayOverridesForStory(gasCatalog, s)
   return {
-    ...top,
-    ...Object.fromEntries(
-      Object.entries(fromNest).filter(([, v]) => typeof v === "string" && v.trim().length > 0)
-    ),
+    ...s,
+    title: o.title ?? s.title,
+    tagline: o.tagline ?? s.tagline,
+    subtitle: o.subtitle ?? s.subtitle,
+    status: o.status ?? s.status,
+    coverImage: o.coverImage ?? s.coverImage,
+    detail: o.detail ?? s.detail,
+    displayTitle: o.title ?? s.title,
+    displayTagline: o.tagline ?? s.tagline ?? "",
+    displaySubtitle: o.subtitle ?? s.subtitle,
   }
 }
 
@@ -162,15 +244,7 @@ export function mergeWorksCatalog(
   const list = staticWorks.filter((s) => isStoryVisibleOnPublicSite(s, gasCatalog))
 
   return list
-    .map((s) => {
-      const o = displayOverridesForStory(gasCatalog, s)
-      return {
-        ...s,
-        displayTitle: o.title ?? s.title,
-        displayTagline: o.tagline ?? s.tagline ?? "",
-        displaySubtitle: o.subtitle ?? s.subtitle,
-      }
-    })
+    .map((s) => applyStoryOverridesToRecord(s, gasCatalog))
     .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
 }
 
@@ -232,13 +306,7 @@ export function mergedItemFromStaticRecord(
   s: WorkStoryRecord,
   gasCatalog: GasWorksCatalog | null | undefined
 ): MergedWorkItem {
-  const o = displayOverridesForStory(gasCatalog, s)
-  return {
-    ...s,
-    displayTitle: o.title ?? s.title,
-    displayTagline: o.tagline ?? s.tagline ?? "",
-    displaySubtitle: o.subtitle ?? s.subtitle,
-  }
+  return applyStoryOverridesToRecord(s, gasCatalog)
 }
 
 /**
@@ -443,6 +511,9 @@ export function hydrateWorksCatalogFromSources(
         ...(o?.title ? { title: o.title } : {}),
         ...(o?.tagline ? { tagline: o.tagline } : {}),
         ...(o?.subtitle ? { subtitle: o.subtitle } : {}),
+        ...(o?.status ? { status: o.status } : {}),
+        ...(o?.coverImage ? { coverImage: o.coverImage } : {}),
+        ...(o?.detail ? { detail: o.detail } : {}),
       }
     }
     const featuredInWork =
@@ -469,7 +540,7 @@ export function hydrateWorksCatalogFromSources(
   return out
 }
 
-/** 管理画面保存用: 表示テキスト上書きをトップレベル overrides に寄せ（GAS 側の単純な参照用）、本体は v2 works を送る */
+/** 管理画面保存用: 表示テキスト・詳細上書きをトップレベル overrides に寄せ、本体は v2 works を送る */
 export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: GasWorksCatalog): GasWorksCatalog {
   const hydrated = hydrateWorksCatalogFromSources(staticWorks, ui)
   const overrides: NonNullable<GasWorksCatalog["overrides"]> = { ...(hydrated.overrides || {}) }
@@ -477,11 +548,14 @@ export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: 
   for (const s of staticWorks) {
     const wk = workKeyFromStoryRecord(s)
     const st = hydrated.works?.[wk]?.stories?.[s.id]
-    const text = {
-      ...(st?.title ? { title: st.title } : {}),
-      ...(st?.tagline ? { tagline: st.tagline } : {}),
-      ...(st?.subtitle ? { subtitle: st.subtitle } : {}),
-    }
+    if (!st) continue
+    const text: NonNullable<GasWorksCatalog["overrides"]>[string] = {}
+    if (st.title) text.title = st.title
+    if (st.tagline) text.tagline = st.tagline
+    if (st.subtitle) text.subtitle = st.subtitle
+    if (st.status) text.status = st.status
+    if (st.coverImage) text.coverImage = st.coverImage
+    if (st.detail && typeof st.detail === "object") text.detail = st.detail
     if (Object.keys(text).length > 0) {
       overrides[s.id] = { ...(overrides[s.id] || {}), ...text }
     }

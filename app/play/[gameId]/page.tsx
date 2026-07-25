@@ -4,7 +4,6 @@ import { Suspense, use, useEffect, useMemo } from "react"
 import { useSearchParams } from "next/navigation"
 import { LS_ACCOUNT, LS_SESSION } from "@/lib/storage-keys"
 import { ReturnToOfficialLink } from "@/components/official-site/return-to-official-link"
-import { MoonlitDiaryGame } from "@/games/moonlit-script/play-ui/moonlit-diary-game"
 
 function PlayFrame({ gameId }: { gameId: string }) {
   const searchParams = useSearchParams()
@@ -106,7 +105,7 @@ export default function PlayGamePage({ params }: { params: Promise<{ gameId: str
         </div>
       }
     >
-      {gameId === "moonlit-script" ? <MoonlitDiaryGame gameId={gameId} /> : <PlayFrame gameId={gameId} />}
+      <PlayFrame gameId={gameId} />
     </Suspense>
   )
 }

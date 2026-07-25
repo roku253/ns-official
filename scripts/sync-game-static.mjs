@@ -34,6 +34,22 @@ if (!fs.existsSync(gamesRoot)) {
 
 fs.mkdirSync(publicGames, { recursive: true })
 
+/** games/ に無い public/games/<slug> は削除（デモ分離後の残骸掃除） */
+const liveSlugs = new Set(
+  fs
+    .readdirSync(gamesRoot, { withFileTypes: true })
+    .filter((ent) => ent.isDirectory() && !ent.name.startsWith("."))
+    .map((ent) => ent.name)
+)
+for (const ent of fs.readdirSync(publicGames, { withFileTypes: true })) {
+  if (!ent.isDirectory() || ent.name.startsWith(".") || ent.name === "_template") continue
+  if (!liveSlugs.has(ent.name)) {
+    const orphan = path.join(publicGames, ent.name)
+    rmrf(orphan)
+    console.log(`sync-game-static: removed orphan public/games/${ent.name}/`)
+  }
+}
+
 const entries = fs.readdirSync(gamesRoot, { withFileTypes: true })
 for (const ent of entries) {
   if (!ent.isDirectory() || ent.name.startsWith(".")) continue

@@ -149,7 +149,13 @@ export default function AdminOfficialCredentialsPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/admin">運営コンソール</Link>
+            <Link href="/admin">プレイヤー</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/works">作品CMS</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/news">お知らせ</Link>
           </Button>
         </div>
       </div>

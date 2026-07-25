@@ -3,16 +3,12 @@
 export const DEFAULT_CASE_ID = "koko-ni-iru"
 
 export const PUBLIC_GAME_ID_TO_CASE_ID: Record<string, string> = {
-  "iron-lock-room": "iron-lock-room",
   "kieta_shounen": "koko-ni-iru",
   "kieta-shounen": "koko-ni-iru",
   "koko_ni_iru": "koko-ni-iru",
   "koko-ni-iru": "koko-ni-iru",
-  "moonlit-script": "moonlit-script",
   "signal_trace": "koko-ni-iru",
-  "signal-drill": "signal-drill",
   "signal-trace": "koko-ni-iru",
-  "vault-prototype": "vault-prototype",
 }
 
 export function resolveCaseIdForPublicGameId(gameId: string, caseIdOverride?: string): string {
@@ -25,10 +21,6 @@ export function resolveCaseIdForPublicGameId(gameId: string, caseIdOverride?: st
 /** manifest の case_id → games/<フォルダ>（静的配信・/play のスラッグ） */
 export const CASE_ID_TO_ENGINE_PACKAGE: Record<string, string> = {
   "koko-ni-iru": "signal-trace",
-  "moonlit-script": "moonlit-script",
-  "iron-lock-room": "iron-lock-room",
-  "signal-drill": "signal-drill",
-  "vault-prototype": "vault-prototype",
 }
 
 /** signal-trace 系案件（別作品デプロイへ rewrite する対象） */

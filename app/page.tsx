@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useMemo } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
@@ -18,7 +18,8 @@ import {
   TypewriterHeading,
 } from "@/components/official-site/scroll-reveal"
 import { WORKS_CATALOG_PATH } from "@/lib/routes"
-import { formatNewsDate, getNewsItems } from "@/lib/official/news"
+import { formatNewsDate, getNewsItems, type NewsItem } from "@/lib/official/news"
+import { fetchPublishedNewsItems } from "@/lib/official/fetch-public-news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 import type { GasWorksCatalog, MergedWorkItem } from "@/lib/official/works-catalog"
 import {
@@ -230,7 +231,19 @@ function CasesSection({
 /* ── News ────────────────────────────────────────────────── */
 
 function NewsSection() {
-  const items = getNewsItems().slice(0, 3)
+  const [items, setItems] = useState<NewsItem[]>(() => getNewsItems().slice(0, 3))
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const next = await fetchPublishedNewsItems()
+      if (!cancelled) setItems(next.slice(0, 3))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <section id="news" className="relative w-full bg-[#0a0c10] py-24 text-center md:py-32">
       <div className="mx-auto max-w-2xl px-4 md:px-6">

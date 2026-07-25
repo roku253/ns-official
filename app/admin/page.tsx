@@ -267,12 +267,17 @@ export default function AdminDashboardPage() {
         <div className="min-w-0 flex-1 space-y-2">
           <h1 className="text-lg font-semibold tracking-tight">運営コンソール</h1>
           <p className="text-muted-foreground text-xs">
-            公式サイトの作品公開と、登録ユーザーのセーブの総合管理です。アカウントは{" "}
-            <code className="rounded bg-muted px-1">Investigators</code>、進行は{" "}
-            <code className="rounded bg-muted px-1">GameProgress</code>（ユーザー×<strong>ストーリー</strong>{" "}
-            <code className="rounded bg-muted px-1">case_id</code>）です。大本のタイトルはカタログの{" "}
-            <code className="rounded bg-muted px-1">game_id</code> で整理します（
-            <code className="rounded bg-muted px-1">lib/admin-game-catalog.ts</code>）。
+            プレイヤー進行の確認・バックアップ。公式コンテンツ（お知らせ・作品詳細・公開）は{" "}
+            <Link href="/admin/news" className="text-primary underline-offset-2 hover:underline">
+              お知らせ
+            </Link>
+            {" / "}
+            <Link href="/admin/works" className="text-primary underline-offset-2 hover:underline">
+              作品CMS
+            </Link>
+            。進行データは <code className="rounded bg-muted px-1">Investigators</code> と{" "}
+            <code className="rounded bg-muted px-1">GameProgress</code>（ユーザー×
+            <code className="rounded bg-muted px-1">case_id</code>）です。紐づけ（case↔エンジン）はコード生成のままです。
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -299,20 +304,23 @@ export default function AdminDashboardPage() {
             </Select>
           </div>
         </div>
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/platform">作品公開</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/credentials">運営メモ・資格情報</Link>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-            再読込
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => void logout()}>
-            退室
-          </Button>
-        </div>
+          <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/admin/works">作品CMS</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/admin/news">お知らせ</Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/admin/credentials">運営メモ・資格情報</Link>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+              再読込
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => void logout()}>
+              退室
+            </Button>
+          </div>
       </header>
 
       <div className="flex flex-1 flex-col gap-4 p-4 md:flex-row md:gap-0 md:p-0">

@@ -7,11 +7,11 @@ export const metadata: Metadata = {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="admin-console flex min-h-screen flex-col bg-background text-foreground antialiased">
-      <p className="border-b border-border/80 bg-card/60 px-3 py-2 text-center text-[10px] leading-snug text-muted-foreground md:px-6">
-        運営専用。ポータルのログインパスワードはシート上ハッシュのみで、この画面からは復元できません。「運営メモ・資格情報」はユーザー別の運営メモや外部サイト用のID・パスワード控え（プレイヤー画面からは参照されません）。メモ用シートの平文は共有範囲を最小にし、コンソール鍵・端末の取り扱いに注意してください。
+    <div className="admin-console min-h-screen bg-[#0e1116] text-[#e6edf3]">
+      <p className="border-b border-[#30363d] bg-[#161b22] px-3 py-1.5 text-center text-[10px] leading-snug text-[#8b949e]">
+        運営専用。ポータルパスワードはシート上ハッシュのみで復元不可。資格情報メモは平文のため共有範囲・端末管理に注意。
       </p>
-      <div className="flex flex-1 flex-col">{children}</div>
+      {children}
     </div>
   )
 }

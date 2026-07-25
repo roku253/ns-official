@@ -5,7 +5,7 @@ import { postGas } from "@/lib/gas"
 import { LS_ACCOUNT, LS_AUTH, LS_SESSION } from "@/lib/storage-keys"
 import type { GasWorksCatalog, MergedWorkItem, WorkStoryRecord } from "@/lib/official/works-catalog"
 import { mergeWorksCatalog } from "@/lib/official/works-catalog"
-import { DEFAULT_CASE_ID } from "@/games/signal-trace/portal-engine/registry"
+import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
 import { consumeOfficialLoaderRequest } from "@/lib/official/official-loader-intent"
 import storiesJson from "@/data/official/stories.json"
 

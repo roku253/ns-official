@@ -5,6 +5,8 @@ import {
   Geist,
   Geist_Mono,
   Hachi_Maru_Pop,
+  IBM_Plex_Mono,
+  IBM_Plex_Sans,
   Klee_One,
   Noto_Sans_JP,
   Shippori_Mincho_B1,
@@ -67,6 +69,18 @@ const vaultHachiPop = Hachi_Maru_Pop({
   variable: "--font-hachi-maru-pop",
 })
 
+const adminSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-admin-sans",
+})
+
+const adminMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-admin-mono",
+})
+
 export const metadata: Metadata = {
   title: 'NS | 公式ポータル',
   description: '謎解き体験の会員向け公式ポータル（NS）です。',
@@ -103,7 +117,7 @@ export default function RootLayout({
   return (
     <html lang="ja" className="min-h-screen">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${officialDisplayJa.variable} ${officialSerifLatin.variable} ${officialSansJp.variable} ${dotGothic16.variable} ${vaultKleeOne.variable} ${vaultYomogi.variable} ${vaultHachiPop.variable} antialiased min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} ${officialDisplayJa.variable} ${officialSerifLatin.variable} ${officialSansJp.variable} ${dotGothic16.variable} ${vaultKleeOne.variable} ${vaultYomogi.variable} ${vaultHachiPop.variable} ${adminSans.variable} ${adminMono.variable} antialiased min-h-screen`}
       >
         {children}
         {/**

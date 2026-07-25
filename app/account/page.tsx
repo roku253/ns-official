@@ -10,12 +10,11 @@ import {
   deserializeProgress,
   progressPayloadSignature,
   serializeProgressForGas,
-} from "@/games/signal-trace/portal-engine/progress-json"
-import { mergeHqBriefingFromGas, type GasHqBriefing } from "@/games/signal-trace/portal-engine/hq-briefing"
-import { mergeProgressTasksWithTemplates } from "@/games/signal-trace/portal-engine/bootstrap-tasks"
-import { DEFAULT_CASE_ID } from "@/games/signal-trace/portal-engine/registry"
+} from "@/lib/platform/progress-json"
+import { mergeHqBriefingFromGas, type GasHqBriefing } from "@/lib/platform/hq-briefing"
+import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
 import type { ProgressState, PortalPreferences, Task, Achievement, Memo, ArchiveItem, Communication, TabType } from "@/lib/types"
-import { mergePortalPreferences, DEFAULT_PORTAL_PREFERENCES } from "@/games/signal-trace/portal-engine/portal-preferences"
+import { mergePortalPreferences, DEFAULT_PORTAL_PREFERENCES } from "@/lib/platform/portal-preferences"
 import { WORKS_CATALOG_PATH } from "@/lib/routes"
 import { openPlayEntry } from "@/lib/official/play-work-navigation"
 
@@ -104,11 +103,7 @@ export default function AccountPage() {
           setSessionEmail(em)
         }
         const merged = mergeHqBriefingFromGas(deserializeProgress(res.progress), res.hqBriefing, cid)
-        const tasks = mergeProgressTasksWithTemplates(merged.tasks, cid)
-        applyLoadedProgress({
-          ...merged,
-          tasks,
-        })
+        applyLoadedProgress(merged)
       } catch {
         if (!cancelled) router.replace("/login")
         return

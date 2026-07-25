@@ -1,11 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { AdminConsoleShell } from "@/components/admin/admin-console-shell"
+import { AdminConsoleShell, adminBtnClass } from "@/components/admin/admin-console-shell"
+import { ADMIN_CACHE_KEYS, adminCacheRead, adminCacheWrite } from "@/lib/admin/admin-cache"
 import {
   getStaticNewsCatalog,
   newNewsId,
@@ -30,6 +30,9 @@ function blankItem(): NewsItem {
   }
 }
 
+const fieldClass =
+  "rounded-sm border-[#30363d] bg-[#0e1116] text-[#e6edf3] placeholder:text-[#8b949e] focus-visible:border-[#1f6feb] focus-visible:ring-[#1f6feb]/30"
+
 export default function AdminNewsPage() {
   const [catalog, setCatalog] = useState<NewsCatalog>(getStaticNewsCatalog())
   const [selectedId, setSelectedId] = useState<string>("")
@@ -37,6 +40,7 @@ export default function AdminNewsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [hasCache, setHasCache] = useState(false)
 
   const sorted = useMemo(
     () => [...catalog.items].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id)),
@@ -55,7 +59,6 @@ export default function AdminNewsPage() {
       const res = await fetch("/api/admin/news", { cache: "no-store" })
       const data = (await res.json()) as { success?: boolean; news?: unknown; message?: string }
       if (!res.ok || !data.success) {
-        // GAS 未対応時は静的フォールバックで編集開始
         const fallback = getStaticNewsCatalog()
         setCatalog(fallback)
         setSelectedId((prev) => prev || fallback.items[0]?.id || "")
@@ -68,6 +71,8 @@ export default function AdminNewsPage() {
       }
       const next = normalizeNewsCatalog(data.news)
       setCatalog(next)
+      adminCacheWrite(ADMIN_CACHE_KEYS.news, next)
+      setHasCache(true)
       setSelectedId((prev) => {
         if (prev && next.items.some((n) => n.id === prev)) return prev
         return next.items[0]?.id || ""
@@ -84,6 +89,13 @@ export default function AdminNewsPage() {
   }, [])
 
   useEffect(() => {
+    const cached = adminCacheRead<NewsCatalog>(ADMIN_CACHE_KEYS.news)
+    if (cached) {
+      setCatalog(cached)
+      setSelectedId((prev) => prev || cached.items[0]?.id || "")
+      setHasCache(true)
+      setLoading(false)
+    }
     void load()
   }, [load])
 
@@ -130,8 +142,9 @@ export default function AdminNewsPage() {
         setError(data.message || "保存に失敗しました。GAS に adminSetNews が必要です。")
         return
       }
-      if (data.news) setCatalog(normalizeNewsCatalog(data.news))
-      else setCatalog(payload)
+      const next = data.news ? normalizeNewsCatalog(data.news) : payload
+      setCatalog(next)
+      adminCacheWrite(ADMIN_CACHE_KEYS.news, next)
       setMessage(data.message || "保存しました。公式 /news は再デプロイなしで反映されます。")
     } catch {
       setError("通信に失敗しました。")
@@ -140,56 +153,49 @@ export default function AdminNewsPage() {
     }
   }
 
-  async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" })
-    window.location.href = "/admin/login"
-  }
+  const showSkeleton = loading && !hasCache
 
   return (
     <AdminConsoleShell
-      title="お知らせCMS"
-      description="トップ NEWS と /news に載せる項目を編集します。保存先は GAS（docs/gas-cms.md）。"
-      onLogout={() => void logout()}
+      title="お知らせ"
+      description="NEWS"
+      toolbar={
+        loading && hasCache ? (
+          <span className="text-[11px] text-[#8b949e]">更新中…</span>
+        ) : null
+      }
       actions={
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            onClick={addItem}
-            variant="outline"
-            className="rounded-none border-[#c9a227]/40 bg-transparent text-[#c9a227] hover:bg-[#c9a227]/10"
-          >
+          <button type="button" onClick={addItem} className={adminBtnClass()}>
             新規追加
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving || loading}
-            className="rounded-none border border-[#c9a227]/55 bg-[#c9a227]/15 text-[#f5ecd4] hover:bg-[#c9a227]/25"
-          >
+          </button>
+          <button type="button" onClick={() => void save()} disabled={saving || loading} className={adminBtnClass("primary")}>
             {saving ? "保存中…" : "保存"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void load()}
-            disabled={loading}
-            className="rounded-none border-[#c9a227]/40 bg-transparent text-[#c9a227] hover:bg-[#c9a227]/10"
-          >
+          </button>
+          <button type="button" onClick={() => void load()} disabled={loading} className={adminBtnClass()}>
             再読込
-          </Button>
+          </button>
         </div>
       }
     >
-      {message ? <p className="mb-4 text-sm text-[#c9a227]">{message}</p> : null}
-      {error ? <p className="mb-4 text-sm text-amber-400/90">{error}</p> : null}
+      {message ? <p className="mb-3 text-[13px] text-[#79b8ff]">{message}</p> : null}
+      {error ? <p className="mb-3 text-[13px] text-[#d29922]">{error}</p> : null}
 
-      {loading ? (
-        <p className="text-sm text-zinc-500">読み込み中…</p>
+      {showSkeleton ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <div className="h-64 animate-pulse rounded-sm border border-[#30363d] bg-[#161b22]" />
+          <div className="h-96 animate-pulse rounded-sm border border-[#30363d] bg-[#161b22]" />
+        </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-          <aside className="space-y-2 border border-[#c9a227]/20 bg-[#06080c] p-3">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">一覧（{sorted.length}）</p>
-            <ul className="max-h-[70vh] space-y-1 overflow-auto">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+          <aside className="space-y-2 border border-[#30363d] bg-[#161b22] p-3">
+            <p
+              className="text-[10px] uppercase tracking-wider text-[#8b949e]"
+              style={{ fontFamily: 'var(--font-admin-mono), "IBM Plex Mono", monospace' }}
+            >
+              一覧（{sorted.length}）
+            </p>
+            <ul className="max-h-[70vh] space-y-0.5 overflow-auto">
               {sorted.map((n) => {
                 const active = n.id === selectedId
                 return (
@@ -198,14 +204,14 @@ export default function AdminNewsPage() {
                       type="button"
                       onClick={() => setSelectedId(n.id)}
                       className={cn(
-                        "flex w-full flex-col items-start gap-0.5 rounded-none border px-2.5 py-2 text-left text-sm",
+                        "flex w-full flex-col items-start gap-0.5 rounded-sm border px-2.5 py-2 text-left text-[13px]",
                         active
-                          ? "border-[#c9a227]/50 bg-[#c9a227]/10 text-[#f5ecd4]"
-                          : "border-transparent text-zinc-300 hover:border-[#c9a227]/25"
+                          ? "border-[#1f6feb]/50 bg-[#1f6feb]/15 text-[#79b8ff]"
+                          : "border-transparent text-[#c9d1d9] hover:border-[#30363d] hover:bg-[#21262d]"
                       )}
                     >
                       <span className="line-clamp-2 font-medium">{n.title || "（無題）"}</span>
-                      <span className="text-[10px] text-zinc-500">
+                      <span className="text-[10px] text-[#8b949e]">
                         {n.date} · {n.category}
                         {n.published === false ? " · 下書き" : ""}
                       </span>
@@ -217,46 +223,40 @@ export default function AdminNewsPage() {
           </aside>
 
           {selected ? (
-            <section className="space-y-4 border border-[#c9a227]/20 bg-[#06080c] p-4 md:p-6">
+            <section className="space-y-4 border border-[#30363d] bg-[#161b22] p-4 md:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 text-[13px]">
                   <input
                     type="checkbox"
                     checked={selected.published !== false}
                     onChange={(e) => updateSelected({ published: e.target.checked })}
-                    className="rounded-none border-[#c9a227]/50 text-[#c9a227]"
+                    className="rounded-sm border-[#30363d] text-[#1f6feb]"
                   />
                   公開する
                 </label>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={deleteSelected}
-                  className="rounded-none border-red-500/40 text-red-300 hover:bg-red-500/10"
-                >
+                <button type="button" onClick={deleteSelected} className={adminBtnClass("danger")}>
                   削除
-                </Button>
+                </button>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-zinc-500">日付 (YYYY-MM-DD)</Label>
+                  <Label className="text-[11px] text-[#8b949e]">日付 (YYYY-MM-DD)</Label>
                   <Input
                     value={selected.date}
                     onChange={(e) => updateSelected({ date: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607] font-mono"
+                    className={cn(fieldClass, "font-mono")}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-zinc-500">カテゴリ</Label>
+                  <Label className="text-[11px] text-[#8b949e]">カテゴリ</Label>
                   <Input
                     value={selected.category}
                     onChange={(e) => updateSelected({ category: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">ID</Label>
+                  <Label className="text-[11px] text-[#8b949e]">ID</Label>
                   <Input
                     value={selected.id}
                     onChange={(e) => {
@@ -268,30 +268,30 @@ export default function AdminNewsPage() {
                       }))
                       setSelectedId(nextId)
                     }}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607] font-mono text-xs"
+                    className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">タイトル</Label>
+                  <Label className="text-[11px] text-[#8b949e]">タイトル</Label>
                   <Input
                     value={selected.title}
                     onChange={(e) => updateSelected({ title: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">本文</Label>
+                  <Label className="text-[11px] text-[#8b949e]">本文</Label>
                   <Textarea
                     value={selected.body}
                     rows={10}
                     onChange={(e) => updateSelected({ body: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607] text-sm"
+                    className={cn(fieldClass, "text-sm")}
                   />
                 </div>
               </div>
             </section>
           ) : (
-            <p className="text-sm text-zinc-500">左の一覧から選ぶか、新規追加してください。</p>
+            <p className="text-[13px] text-[#8b949e]">左の一覧から選ぶか、新規追加してください。</p>
           )}
         </div>
       )}

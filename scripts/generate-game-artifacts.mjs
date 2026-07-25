@@ -283,68 +283,11 @@ export const ADMIN_GAME_CATALOG_GENERATED: AdminGameDefinition[] = ${JSON.string
   }
 
   const playableAll = sortedAll.filter(hasPlayableModules)
-  const playableSignal = signalRows.filter(hasPlayableModules)
-  const hubDefault =
-    playableSignal.find((r) => r.data.isDefaultCase === true)?.caseId ??
-    signalRows.find((r) => r.data.isDefaultCase === true)?.caseId ??
-    signalRows[0]?.caseId ??
-    defaultCaseId
-
+  // 公式リポでは portal-engine を置かない（作品デプロイ側が正本）。存在する場合のみレガシー生成。
   if (fs.existsSync(portalHub)) {
-    const structImportsSt = playableSignal
-      .map((r) => {
-        const p = kebabToScreamingPrefix(r.caseId)
-        return `import { ${p}_CASE_STRUCTURE } from "@/games/signal-trace/cases/${r.caseId}"`
-      })
-      .join("\n")
-    const structEntriesSt = playableSignal
-      .map((r) => {
-        const p = kebabToScreamingPrefix(r.caseId)
-        return `  ${JSON.stringify(r.caseId)}: ${p}_CASE_STRUCTURE,`
-      })
-      .join("\n")
-    const caseStructurePortalOnly = `/* eslint-disable */
-/**
- * AUTO-GENERATED — do not edit.
- * Regenerate: npm run generate:games
- * 公式リポではカタログ専用の signal-trace 案件は空になり得る（プレイ本体は作品デプロイ）。
- */
-import type { CaseTaskStructure } from "./types"
-${structImportsSt}
-
-export const STRUCTURE_BY_CASE: Record<string, CaseTaskStructure> = {
-${structEntriesSt}
-}
-
-export const DEFAULT_CASE_ID = ${JSON.stringify(hubDefault)} as const
-`
-    writeIfChanged(path.join(portalHub, "case-structure-registry.generated.ts"), caseStructurePortalOnly)
-
-    const secImportsSt = playableSignal
-      .map((r) => {
-        const p = kebabToScreamingPrefix(r.caseId)
-        return `import { ${p}_TASK_SECRETS } from "@/games/signal-trace/cases/${r.caseId}/task-secrets"`
-      })
-      .join("\n")
-    const secEntriesSt = playableSignal
-      .map((r) => {
-        const p = kebabToScreamingPrefix(r.caseId)
-        return `  ${JSON.stringify(r.caseId)}: ${p}_TASK_SECRETS,`
-      })
-      .join("\n")
-    const secretsPortalOnly = `/* eslint-disable */
-/** AUTO-GENERATED — do not edit. Regenerate: npm run generate:games */
-import "server-only"
-import type { CaseTaskSecrets } from "@/games/signal-trace/portal-engine/types"
-${secImportsSt}
-
-export const SECRETS_BY_CASE: Record<string, Record<string, CaseTaskSecrets>> = {
-${secEntriesSt}
-}
-`
-    const serverDir = path.join(portalHub, "server")
-    fs.mkdirSync(serverDir, { recursive: true })
-    writeIfChanged(path.join(serverDir, "secrets-registry.generated.ts"), secretsPortalOnly)
+    console.warn(
+      "generate-game-artifacts: games/signal-trace/portal-engine が残っています（公式では不要。削除推奨）"
+    )
   }
 
   const structImportsAll = playableAll
@@ -361,7 +304,7 @@ ${secEntriesSt}
     .join("\n")
   const platformStructureTs = `/* eslint-disable */
 /** AUTO-GENERATED — do not edit. Regenerate: npm run generate:games */
-import type { CaseTaskStructure } from "@/games/signal-trace/portal-engine/types"
+import type { CaseTaskStructure } from "@/lib/platform/case-types"
 ${structImportsAll}
 
 export const STRUCTURE_BY_CASE_ALL: Record<string, CaseTaskStructure> = {
@@ -385,7 +328,7 @@ ${structEntriesAll}
   const platformSecretsTs = `/* eslint-disable */
 /** AUTO-GENERATED — do not edit. Regenerate: npm run generate:games */
 import "server-only"
-import type { CaseTaskSecrets } from "@/games/signal-trace/portal-engine/types"
+import type { CaseTaskSecrets } from "@/lib/platform/case-types"
 ${secImportsAll}
 
 export const SECRETS_BY_CASE_ALL: Record<string, Record<string, CaseTaskSecrets>> = {

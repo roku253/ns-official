@@ -1,4 +1,4 @@
-import type { CaseTaskStructure, TaskGroupTemplate, TaskTemplate } from "@/games/signal-trace/portal-engine/types"
+import type { CaseTaskStructure, TaskGroupTemplate, TaskTemplate } from "@/lib/platform/case-types"
 import { STRUCTURE_BY_CASE_ALL } from "@/lib/platform/all-cases-structure.generated"
 
 /** 全パッケージ案件のタスク構造（任務ポータル UI 外・API・進捗マージ用） */

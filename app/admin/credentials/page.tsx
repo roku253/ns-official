@@ -1,11 +1,9 @@
 "use client"
 
-import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { AdminConsoleShell, adminBtnClass } from "@/components/admin/admin-console-shell"
 
 type CredentialRow = {
   loginId: string
@@ -17,6 +15,9 @@ type CredentialRow = {
   notes: string
   updatedAt: string
 }
+
+const fieldClass =
+  "rounded-sm border-[#30363d] bg-[#0e1116] text-[#e6edf3] placeholder:text-[#8b949e] focus-visible:border-[#1f6feb] focus-visible:ring-[#1f6feb]/30"
 
 export default function AdminOfficialCredentialsPage() {
   const [rows, setRows] = useState<CredentialRow[]>([])
@@ -137,114 +138,118 @@ export default function AdminOfficialCredentialsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">運営メモ · ID / パスワード（ユーザー別）</h1>
-          <p className="text-muted-foreground text-xs">
-            スプレッドシート <code className="rounded bg-muted px-1">NSOfficialCredentials</code> と同期。外部サイト用のほか、サポート用のポータルID控えなど運営が必要なメモに使えます。{" "}
-            <code className="rounded bg-muted px-1">resource_key</code> で種別を分けてください（例:{" "}
-            <code className="rounded bg-muted px-1">urban-board</code>、<code className="rounded bg-muted px-1">portal-memo</code>）。
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin">プレイヤー</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/works">作品CMS</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/news">お知らせ</Link>
-          </Button>
-        </div>
-      </div>
+    <AdminConsoleShell
+      title="資格情報"
+      description="メモ・外部ID"
+      actions={
+        <button type="button" onClick={() => void load()} disabled={loading} className={adminBtnClass()}>
+          再読込
+        </button>
+      }
+    >
+      <div className="mx-auto max-w-4xl space-y-4">
+        <p className="text-[12px] text-[#8b949e]">
+          スプレッドシート <code className="rounded-sm bg-[#21262d] px-1 text-[#c9d1d9]">NSOfficialCredentials</code>{" "}
+          と同期。外部サイト用のほか、サポート用のポータルID控えなど運営メモに使えます。{" "}
+          <code className="rounded-sm bg-[#21262d] px-1 text-[#c9d1d9]">resource_key</code> で種別を分けてください（例:{" "}
+          <code className="rounded-sm bg-[#21262d] px-1 text-[#c9d1d9]">urban-board</code>、
+          <code className="rounded-sm bg-[#21262d] px-1 text-[#c9d1d9]">portal-memo</code>）。
+        </p>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">追加・更新</CardTitle>
-          <CardDescription>同一 loginId + resourceKey は上書きされます。</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <div className="space-y-1">
-            <Label className="text-xs">loginId</Label>
-            <Input
-              className="font-mono text-sm"
-              value={form.loginId}
-              onChange={(e) => setForm((f) => ({ ...f, loginId: e.target.value }))}
-            />
+        <section className="space-y-3 border border-[#30363d] bg-[#161b22] p-4">
+          <div>
+            <h2 className="text-[14px] font-semibold text-[#f0f6fc]">追加・更新</h2>
+            <p className="mt-0.5 text-[11px] text-[#8b949e]">同一 loginId + resourceKey は上書きされます。</p>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">resource_key</Label>
-            <Input
-              className="font-mono text-sm"
-              value={form.resourceKey}
-              onChange={(e) => setForm((f) => ({ ...f, resourceKey: e.target.value }))}
-            />
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-[#8b949e]">loginId</Label>
+              <Input
+                className={`font-mono text-sm ${fieldClass}`}
+                value={form.loginId}
+                onChange={(e) => setForm((f) => ({ ...f, loginId: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-[#8b949e]">resource_key</Label>
+              <Input
+                className={`font-mono text-sm ${fieldClass}`}
+                value={form.resourceKey}
+                onChange={(e) => setForm((f) => ({ ...f, resourceKey: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className="text-[11px] text-[#8b949e]">表示ラベル</Label>
+              <Input
+                className={fieldClass}
+                value={form.label}
+                onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className="text-[11px] text-[#8b949e]">URL（任意）</Label>
+              <Input
+                className={fieldClass}
+                value={form.url}
+                onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-[#8b949e]">ユーザー名・ID</Label>
+              <Input
+                className={`font-mono text-sm ${fieldClass}`}
+                value={form.username}
+                onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-[#8b949e]">パスワード</Label>
+              <Input
+                type={showSecrets ? "text" : "password"}
+                className={`font-mono text-sm ${fieldClass}`}
+                value={form.password}
+                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label className="text-[11px] text-[#8b949e]">メモ</Label>
+              <Input
+                className={fieldClass}
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+              <button type="button" onClick={() => void saveUpsert()} disabled={saving} className={adminBtnClass("primary")}>
+                {saving ? "保存中…" : "保存"}
+              </button>
+              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#8b949e]">
+                <input type="checkbox" checked={showSecrets} onChange={(e) => setShowSecrets(e.target.checked)} />
+                パスワードを表示
+              </label>
+            </div>
           </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label className="text-xs">表示ラベル</Label>
-            <Input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label className="text-xs">URL（任意）</Label>
-            <Input value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">ユーザー名・ID</Label>
-            <Input
-              className="font-mono text-sm"
-              value={form.username}
-              onChange={(e) => setForm((f) => ({ ...f, username: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">パスワード</Label>
-            <Input
-              type={showSecrets ? "text" : "password"}
-              className="font-mono text-sm"
-              value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <Label className="text-xs">メモ</Label>
-            <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
-          </div>
-          <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-            <Button type="button" onClick={() => void saveUpsert()} disabled={saving}>
-              {saving ? "保存中…" : "保存"}
-            </Button>
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={showSecrets} onChange={(e) => setShowSecrets(e.target.checked)} />
-              パスワードを表示
-            </label>
-          </div>
-        </CardContent>
-      </Card>
+        </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">一覧</CardTitle>
-          <CardDescription className="flex flex-wrap items-center gap-2">
+        <section className="space-y-3 border border-[#30363d] bg-[#161b22] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-[14px] font-semibold text-[#f0f6fc]">一覧</h2>
             <Input
               placeholder="loginId で絞り込み"
-              className="max-w-xs font-mono text-sm"
+              className={`max-w-xs font-mono text-sm ${fieldClass}`}
               value={filterLogin}
               onChange={(e) => setFilterLogin(e.target.value)}
             />
-            <Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
-              再読込
-            </Button>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </div>
           {loading ? (
-            <p className="text-muted-foreground text-sm">読み込み中…</p>
+            <p className="text-[13px] text-[#8b949e]">読み込み中…</p>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/40 text-xs text-muted-foreground">
+            <div className="overflow-x-auto rounded-sm border border-[#30363d]">
+              <table className="w-full text-left text-[13px]">
+                <thead
+                  className="bg-[#0e1116] text-[11px] text-[#8b949e]"
+                  style={{ fontFamily: 'var(--font-admin-mono), "IBM Plex Mono", monospace' }}
+                >
                   <tr>
                     <th className="p-2 font-medium">loginId</th>
                     <th className="p-2 font-medium">key</th>
@@ -257,27 +262,29 @@ export default function AdminOfficialCredentialsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r) => (
-                    <tr key={`${r.loginId}-${r.resourceKey}`} className="border-t border-border/60">
-                      <td className="p-2 font-mono text-xs">{r.loginId}</td>
-                      <td className="p-2 font-mono text-xs">{r.resourceKey}</td>
-                      <td className="p-2 text-xs">{r.label}</td>
-                      <td className="p-2 font-mono text-xs">{showSecrets ? r.username : r.username ? "•••" : "—"}</td>
-                      <td className="p-2 font-mono text-xs">{showSecrets ? r.password : r.password ? "•••" : "—"}</td>
-                      <td className="p-2 text-[10px] text-muted-foreground">{r.updatedAt || "—"}</td>
+                    <tr key={`${r.loginId}-${r.resourceKey}`} className="border-t border-[#30363d]">
+                      <td className="p-2 font-mono text-[12px] text-[#c9d1d9]">{r.loginId}</td>
+                      <td className="p-2 font-mono text-[12px] text-[#c9d1d9]">{r.resourceKey}</td>
+                      <td className="p-2 text-[12px] text-[#c9d1d9]">{r.label}</td>
+                      <td className="p-2 font-mono text-[12px] text-[#c9d1d9]">
+                        {showSecrets ? r.username : r.username ? "•••" : "—"}
+                      </td>
+                      <td className="p-2 font-mono text-[12px] text-[#c9d1d9]">
+                        {showSecrets ? r.password : r.password ? "•••" : "—"}
+                      </td>
+                      <td className="p-2 text-[10px] text-[#8b949e]">{r.updatedAt || "—"}</td>
                       <td className="p-2">
                         <div className="flex flex-wrap gap-1">
-                          <Button type="button" variant="outline" size="sm" onClick={() => startEdit(r)}>
+                          <button type="button" onClick={() => startEdit(r)} className={adminBtnClass()}>
                             編集
-                          </Button>
-                          <Button
+                          </button>
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-destructive"
+                            className={adminBtnClass("danger")}
                             onClick={() => void removeRow(r.loginId, r.resourceKey)}
                           >
                             削除
-                          </Button>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -286,10 +293,10 @@ export default function AdminOfficialCredentialsPage() {
               </table>
             </div>
           )}
-          {message ? <p className="mt-3 text-sm text-primary">{message}</p> : null}
-          {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
-        </CardContent>
-      </Card>
-    </div>
+          {message ? <p className="text-[13px] text-[#79b8ff]">{message}</p> : null}
+          {error ? <p className="text-[13px] text-[#f85149]">{error}</p> : null}
+        </section>
+      </div>
+    </AdminConsoleShell>
   )
 }

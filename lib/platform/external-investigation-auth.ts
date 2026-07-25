@@ -11,7 +11,7 @@
  *    本ファイルのリスナーが NS_AUTH_GRANT で返す。
  */
 import { LS_ACCOUNT } from "@/lib/storage-keys"
-import { DEFAULT_CASE_ID } from "@/games/signal-trace/portal-engine/registry"
+import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
 
 /** 子ページの postMessage がこの origin から来ることだけ許可する */
 const ALLOWED_CHILD_ORIGINS = new Set<string>(["https://roku253.github.io"])

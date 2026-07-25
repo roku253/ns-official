@@ -7,7 +7,7 @@ import type {
   Task,
   TabType,
 } from "@/lib/types"
-import { portalPreferencesFromProgressJson } from "@/games/signal-trace/portal-engine/portal-preferences"
+import { portalPreferencesFromProgressJson } from "@/lib/platform/portal-preferences"
 
 function reviveTask(raw: Record<string, unknown>): Task {
   const st = raw.status

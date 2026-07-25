@@ -14,7 +14,7 @@ import { LS_ACCOUNT, LS_AUTH, LS_SESSION } from "@/lib/storage-keys"
 import { clearGateEmail } from "@/lib/gate-email"
 import { postGas } from "@/lib/gas"
 import type { PortalPreferences } from "@/lib/types"
-import { mergePortalPreferences, DEFAULT_PORTAL_PREFERENCES } from "@/games/signal-trace/portal-engine/portal-preferences"
+import { mergePortalPreferences, DEFAULT_PORTAL_PREFERENCES } from "@/lib/platform/portal-preferences"
 import {
   Dialog,
   DialogContent,

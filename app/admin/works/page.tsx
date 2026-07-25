@@ -1,11 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { AdminConsoleShell } from "@/components/admin/admin-console-shell"
+import { AdminConsoleShell, adminBtnClass } from "@/components/admin/admin-console-shell"
+import { ADMIN_CACHE_KEYS, adminCacheRead, adminCacheWrite } from "@/lib/admin/admin-cache"
 import stories from "@/data/official/stories.json"
 import type {
   GasStoryEntry,
@@ -50,6 +50,9 @@ function storyEntryOrDefaults(catalog: GasWorksCatalog, story: StoryRow): GasSto
   }
 }
 
+const fieldClass =
+  "rounded-sm border-[#30363d] bg-[#0e1116] text-[#e6edf3] placeholder:text-[#8b949e] focus-visible:border-[#1f6feb] focus-visible:ring-[#1f6feb]/30"
+
 export default function AdminWorksCmsPage() {
   const staticStories = stories as StoryRow[]
   const [catalog, setCatalog] = useState<GasWorksCatalog>({})
@@ -58,6 +61,7 @@ export default function AdminWorksCmsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [hasCache, setHasCache] = useState(false)
 
   const selected = useMemo(
     () => staticStories.find((s) => s.id === selectedId) ?? staticStories[0] ?? null,
@@ -80,7 +84,10 @@ export default function AdminWorksCmsPage() {
         return
       }
       const raw = data.catalog && typeof data.catalog === "object" ? data.catalog : {}
-      setCatalog(hydrateWorksCatalogFromSources(staticStories, raw))
+      const next = hydrateWorksCatalogFromSources(staticStories, raw)
+      setCatalog(next)
+      adminCacheWrite(ADMIN_CACHE_KEYS.worksCatalog, next)
+      setHasCache(true)
     } catch {
       setError("通信に失敗しました。")
     } finally {
@@ -89,6 +96,12 @@ export default function AdminWorksCmsPage() {
   }, [staticStories])
 
   useEffect(() => {
+    const cached = adminCacheRead<GasWorksCatalog>(ADMIN_CACHE_KEYS.worksCatalog)
+    if (cached) {
+      setCatalog(cached)
+      setHasCache(true)
+      setLoading(false)
+    }
     void load()
   }, [load])
 
@@ -144,18 +157,15 @@ export default function AdminWorksCmsPage() {
         setError(data.message || "保存に失敗しました。")
         return
       }
-      setCatalog(hydrateWorksCatalogFromSources(staticStories, payload))
+      const next = hydrateWorksCatalogFromSources(staticStories, payload)
+      setCatalog(next)
+      adminCacheWrite(ADMIN_CACHE_KEYS.worksCatalog, next)
       setMessage(data.message || "保存しました。公式サイトは再デプロイなしで反映されます（数秒〜再読込）。")
     } catch {
       setError("通信に失敗しました。")
     } finally {
       setSaving(false)
     }
-  }
-
-  async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" })
-    window.location.href = "/admin/login"
   }
 
   const detail = draft?.detail || emptyDetail()
@@ -165,43 +175,46 @@ export default function AdminWorksCmsPage() {
     .map((s) => (s.alt ? `${s.src} | ${s.alt}` : s.src))
     .join("\n")
 
+  const showSkeleton = loading && !hasCache
+
   return (
     <AdminConsoleShell
-      title="作品CMS"
-      description="公開・おすすめ・詳細文面をスプレッドシート（NSPlatform）に保存します。紐づけ（case↔エンジン↔rewrite）はコード側のままです。"
-      onLogout={() => void logout()}
+      title="作品"
+      description="公開・詳細CMS"
+      toolbar={
+        loading && hasCache ? (
+          <span className="text-[11px] text-[#8b949e]">更新中…</span>
+        ) : null
+      }
       actions={
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving || loading}
-            className="rounded-none border border-[#c9a227]/55 bg-[#c9a227]/15 text-[#f5ecd4] hover:bg-[#c9a227]/25"
-          >
+          <button type="button" onClick={() => void save()} disabled={saving || loading} className={adminBtnClass("primary")}>
             {saving ? "保存中…" : "保存"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void load()}
-            disabled={loading}
-            className="rounded-none border-[#c9a227]/40 bg-transparent text-[#c9a227] hover:bg-[#c9a227]/10"
-          >
+          </button>
+          <button type="button" onClick={() => void load()} disabled={loading} className={adminBtnClass()}>
             再読込
-          </Button>
+          </button>
         </div>
       }
     >
-      {message ? <p className="mb-4 text-sm text-[#c9a227]">{message}</p> : null}
-      {error ? <p className="mb-4 text-sm text-red-400">{error}</p> : null}
+      {message ? <p className="mb-3 text-[13px] text-[#79b8ff]">{message}</p> : null}
+      {error ? <p className="mb-3 text-[13px] text-[#f85149]">{error}</p> : null}
 
-      {loading ? (
-        <p className="text-sm text-zinc-500">読み込み中…</p>
+      {showSkeleton ? (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+          <div className="h-64 animate-pulse rounded-sm border border-[#30363d] bg-[#161b22]" />
+          <div className="h-96 animate-pulse rounded-sm border border-[#30363d] bg-[#161b22]" />
+        </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
-          <aside className="space-y-2 border border-[#c9a227]/20 bg-[#06080c] p-3">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500">作品一覧</p>
-            <ul className="space-y-1">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+          <aside className="space-y-2 border border-[#30363d] bg-[#161b22] p-3">
+            <p
+              className="text-[10px] uppercase tracking-wider text-[#8b949e]"
+              style={{ fontFamily: 'var(--font-admin-mono), "IBM Plex Mono", monospace' }}
+            >
+              作品一覧
+            </p>
+            <ul className="space-y-0.5">
               {staticStories.map((s) => {
                 const wk = workKeyFromStoryRecord(s)
                 const on = catalog.works?.[wk]?.stories?.[s.id]?.published !== false
@@ -212,15 +225,20 @@ export default function AdminWorksCmsPage() {
                       type="button"
                       onClick={() => setSelectedId(s.id)}
                       className={cn(
-                        "flex w-full flex-col items-start gap-0.5 rounded-none border px-2.5 py-2 text-left text-sm transition-colors",
+                        "flex w-full flex-col items-start gap-0.5 rounded-sm border px-2.5 py-2 text-left text-[13px] transition-colors",
                         active
-                          ? "border-[#c9a227]/50 bg-[#c9a227]/10 text-[#f5ecd4]"
-                          : "border-transparent text-zinc-300 hover:border-[#c9a227]/25 hover:bg-[#0a0c10]"
+                          ? "border-[#1f6feb]/50 bg-[#1f6feb]/15 text-[#79b8ff]"
+                          : "border-transparent text-[#c9d1d9] hover:border-[#30363d] hover:bg-[#21262d]"
                       )}
                     >
                       <span className="font-medium">{s.title}</span>
-                      <span className="font-mono text-[10px] text-zinc-500">{s.id}</span>
-                      <span className={cn("text-[10px]", on ? "text-emerald-400/80" : "text-zinc-600")}>
+                      <span
+                        className="text-[10px] text-[#8b949e]"
+                        style={{ fontFamily: 'var(--font-admin-mono), "IBM Plex Mono", monospace' }}
+                      >
+                        {s.id}
+                      </span>
+                      <span className={cn("text-[10px]", on ? "text-[#3fb950]" : "text-[#8b949e]")}>
                         {on ? "公開" : "非公開"}
                       </span>
                     </button>
@@ -231,74 +249,74 @@ export default function AdminWorksCmsPage() {
           </aside>
 
           {selected && draft ? (
-            <section className="space-y-6 border border-[#c9a227]/20 bg-[#06080c] p-4 md:p-6">
-              <div className="flex flex-wrap items-center gap-4 border-b border-[#c9a227]/15 pb-4">
-                <label className="flex items-center gap-2 text-sm">
+            <section className="space-y-5 border border-[#30363d] bg-[#161b22] p-4 md:p-5">
+              <div className="flex flex-wrap items-center gap-4 border-b border-[#30363d] pb-3">
+                <label className="flex items-center gap-2 text-[13px]">
                   <input
                     type="checkbox"
                     checked={draft.published !== false}
                     onChange={(e) => patchSelectedStory({ published: e.target.checked })}
-                    className="rounded-none border-[#c9a227]/50 text-[#c9a227]"
+                    className="rounded-sm border-[#30363d] text-[#1f6feb]"
                   />
                   公式サイトに公開
                 </label>
-                <label className="flex items-center gap-2 text-sm text-zinc-400">
+                <label className="flex items-center gap-2 text-[13px] text-[#8b949e]">
                   <input
                     type="radio"
                     name="featured"
                     checked={(catalog.featuredId ?? "") === selected.id}
                     onChange={() => setFeatured(selected.id)}
-                    className="rounded-none border-[#c9a227]/50 text-[#c9a227]"
+                    className="border-[#30363d] text-[#1f6feb]"
                   />
                   トップおすすめ
                 </label>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">タイトル</Label>
+                  <Label className="text-[11px] text-[#8b949e]">タイトル</Label>
                   <Input
                     value={draft.title || ""}
                     onChange={(e) => patchSelectedStory({ title: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">タグライン</Label>
+                  <Label className="text-[11px] text-[#8b949e]">タグライン</Label>
                   <Input
                     value={draft.tagline || ""}
                     onChange={(e) => patchSelectedStory({ tagline: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">サブタイトル</Label>
+                  <Label className="text-[11px] text-[#8b949e]">サブタイトル</Label>
                   <Input
                     value={draft.subtitle || ""}
                     onChange={(e) => patchSelectedStory({ subtitle: e.target.value })}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-zinc-500">ステータス</Label>
+                  <Label className="text-[11px] text-[#8b949e]">ステータス</Label>
                   <Input
                     value={draft.status || ""}
                     onChange={(e) => patchSelectedStory({ status: e.target.value })}
                     placeholder="active / preview"
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-zinc-500">カバー画像 URL</Label>
+                  <Label className="text-[11px] text-[#8b949e]">カバー画像 URL</Label>
                   <Input
                     value={draft.coverImage || ""}
                     onChange={(e) => patchSelectedStory({ coverImage: e.target.value })}
                     placeholder="/games/signal-trace/cover-….webp"
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607] font-mono text-xs"
+                    className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-zinc-500">プレイ時間 min（分）</Label>
+                  <Label className="text-[11px] text-[#8b949e]">プレイ時間 min（分）</Label>
                   <Input
                     type="number"
                     value={detail.estimatedPlayMinutesMin ?? ""}
@@ -308,11 +326,11 @@ export default function AdminWorksCmsPage() {
                         detail: { ...detail, estimatedPlayMinutesMin: Number.isFinite(n) ? n : undefined },
                       })
                     }}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-zinc-500">プレイ時間 max（分）</Label>
+                  <Label className="text-[11px] text-[#8b949e]">プレイ時間 max（分）</Label>
                   <Input
                     type="number"
                     value={detail.estimatedPlayMinutesMax ?? ""}
@@ -322,11 +340,11 @@ export default function AdminWorksCmsPage() {
                         detail: { ...detail, estimatedPlayMinutesMax: Number.isFinite(n) ? n : undefined },
                       })
                     }}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">ジャンル（カンマ区切り）</Label>
+                  <Label className="text-[11px] text-[#8b949e]">ジャンル（カンマ区切り）</Label>
                   <Input
                     value={genresText}
                     onChange={(e) =>
@@ -340,11 +358,11 @@ export default function AdminWorksCmsPage() {
                         },
                       })
                     }
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607]"
+                    className={fieldClass}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">詳細説明（空行で段落分け）</Label>
+                  <Label className="text-[11px] text-[#8b949e]">詳細説明（空行で段落分け）</Label>
                   <Textarea
                     value={longText}
                     rows={8}
@@ -359,11 +377,11 @@ export default function AdminWorksCmsPage() {
                         },
                       })
                     }
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607] text-sm"
+                    className={cn(fieldClass, "text-sm")}
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs text-zinc-500">
+                  <Label className="text-[11px] text-[#8b949e]">
                     スクリーンショット（1行1枚: URL または URL | alt）
                   </Label>
                   <Textarea
@@ -383,13 +401,13 @@ export default function AdminWorksCmsPage() {
                         .filter((s) => s.src)
                       patchSelectedStory({ detail: { ...detail, screenshots } })
                     }}
-                    className="rounded-none border-[#c9a227]/30 bg-[#050607] font-mono text-xs"
+                    className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>
               </div>
             </section>
           ) : (
-            <p className="text-sm text-zinc-500">編集できる作品がありません。</p>
+            <p className="text-[13px] text-[#8b949e]">編集できる作品がありません。</p>
           )}
         </div>
       )}

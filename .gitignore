@@ -25,3 +25,5 @@ public/games/
 
 # local extracts / noise
 _board_extract/
+.vercel
+.env*

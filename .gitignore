@@ -1,0 +1,27 @@
+# dependencies / build
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+.DS_Store
+
+# local / secrets
+.vercel/
+.env
+.env.local
+.env.*.local
+.env*.local
+
+# v0 sandbox internals
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+next.user-config.*
+
+# generated static game assets (prebuild regenerates)
+public/games/
+
+# local extracts / noise
+_board_extract/

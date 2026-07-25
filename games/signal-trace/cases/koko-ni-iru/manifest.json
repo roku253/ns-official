@@ -1,0 +1,30 @@
+{
+  "caseId": "koko-ni-iru",
+  "enginePackage": "signal-trace",
+  "engineTitle": "シグナル・トレース",
+  "publicGameIds": ["signal-trace", "signal_trace", "koko-ni-iru", "koko_ni_iru", "kieta-shounen", "kieta_shounen"],
+  "adminStoryTitle": "ここにいる",
+  "adminProgressView": "portal",
+  "isDefaultCase": true,
+  "catalog": {
+    "title": "ここにいる",
+    "subtitle": "霞ノ杜・2019・児童失踪伝言の検証",
+    "tagline": "記録班からの依頼。都市伝説掲示板と公開記録を横断する調査体験。",
+    "status": "active",
+    "theme": "digital-mystery-ghost",
+    "gameKind": "investigation",
+    "published": true,
+    "featured": true,
+    "sortOrder": 0,
+    "accent": "from-[#070b14] via-cyan-950/95 to-emerald-950/85",
+    "detail": {
+      "estimatedPlayMinutesMin": 60,
+      "estimatedPlayMinutesMax": 120,
+      "genres": ["Web謎解き", "横断調査", "記録班", "心理ミステリー"],
+      "longDescription": [
+        "都市伝説好きの有志が運営する記録班の調査員として、匿名依頼の「消えた友達」と霞ノ杜の神隠し伝言を追う。",
+        "掲示板・町・学校・地図・報道映像を横断し、怪奇から社会派、そして記憶の再構成へ——最後に何を伝えるか選ぶ。"
+      ]
+    }
+  }
+}

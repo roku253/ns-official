@@ -1,0 +1,90 @@
+{
+  "description_ja": "運営がどこを編集すればよいかの一覧。秘匿レベルは運営判断の目安。readme_section はローカルの PRIVATE-NOTES.local.md の「§2 運営・編集ガイド」内の節番号（例 2.4）と対応。",
+  "sources": [
+    {
+      "id": "gas-case-mail-provider",
+      "label_ja": "運営メール（実メール・件名・本文・登録URL）",
+      "path": "apps-script/reference-code.gs.txt",
+      "gas_fields": ["CASES.koko-ni-iru.mail.providerSubject", "providerSenderName", "providerBodyLines", "accountSetupUrl"],
+      "player_browser_visible": "メール受信後は文面は見える。リポジトリに平文で載せると第三者にも見える",
+      "redeploy": ["gas"],
+      "readme_section": "2.2"
+    },
+    {
+      "id": "gas-case-mail-hq",
+      "label_ja": "ゲーム内本部連絡（件名・物語・掲示板URL）",
+      "path": "apps-script/reference-code.gs.txt",
+      "gas_fields": ["CASES.koko-ni-iru.mail.subject", "senderName", "storyLines", "urbanLegendBoardUrl"],
+      "player_browser_visible": "ポータル「連絡」で読める。正解キーワードはここには含めない想定",
+      "redeploy": ["gas"],
+      "readme_section": "2.3"
+    },
+    {
+      "id": "gas-secrets",
+      "label_ja": "合言葉・許可メール・パスワードソルト・keywordRoutes（Script Properties に移行済み）",
+      "path": "GAS エディタ → プロジェクトの設定 → スクリプト プロパティ",
+      "gas_fields": ["PASSWORD_SALT", "SECRET_WORD__<caseId>", "ALLOWED_USERS__<caseId>", "KEYWORD_ROUTES__<caseId>", "ADMIN_PORTAL_KEY"],
+      "player_browser_visible": "コード・リポジトリには載せない。GAS の管理画面でのみ編集",
+      "redeploy": [],
+      "readme_section": "2.5"
+    },
+    {
+      "id": "next-task-templates",
+      "label_ja": "タスク見出し・説明・連絡文など（公開テンプレ）",
+      "path": "main-portal-next/games/signal-trace/cases/koko-ni-iru/task-templates.ts",
+      "player_browser_visible": "UI 用テキストはバンドルに含まれる。正解キーワード・参照画像は task-secrets.ts（サーバーのみ）",
+      "redeploy": ["next_restart_or_rebuild"],
+      "readme_section": "2.4"
+    },
+    {
+      "id": "static-bulletin-board",
+      "label_ja": "掲示板ページ（HTML・レス演出）",
+      "path": "（このリポジトリ外）任意の静的HTMLホスト。URL は GAS の urbanLegendBoardUrl に記載",
+      "player_browser_visible": "意図どおり公開コンテンツ",
+      "redeploy": ["static_host_upload"],
+      "readme_section": "2.7"
+    },
+    {
+      "id": "next-env",
+      "label_ja": "GAS の Web アプリ URL",
+      "path": "main-portal-next/.env.local",
+      "keys": ["NEXT_PUBLIC_GAS_URL"],
+      "player_browser_visible": "NEXT_PUBLIC はブラウザに出る前提。URL自体は秘密ではないが誤設定に注意",
+      "redeploy": ["next_restart"],
+      "readme_section": "5.1"
+    },
+    {
+      "id": "next-game-manifest",
+      "label_ja": "作品メタ・公開ルーティングの正本（各案件 manifest.json）",
+      "path": "main-portal-next/games/signal-trace/cases/koko-ni-iru/manifest.json",
+      "player_browser_visible": "公開前提（タイトル等）。正解は含めない",
+      "redeploy": ["next_restart_or_rebuild"],
+      "readme_section": "2.8"
+    },
+    {
+      "id": "next-stories-json",
+      "label_ja": "公開用ストーリーメタ（manifest から npm run generate:games で生成）",
+      "path": "main-portal-next/data/official/stories.json",
+      "player_browser_visible": "公開前提",
+      "redeploy": ["next_restart_or_rebuild"],
+      "readme_section": "2.8"
+    },
+    {
+      "id": "next-news-json",
+      "label_ja": "公式サイトお知らせ（/news とトップ NEWS 欄）",
+      "path": "main-portal-next/data/official/news.json",
+      "player_browser_visible": "公開前提。items に {id, date, category, title, body} を追加して再デプロイ",
+      "redeploy": ["next_restart_or_rebuild"],
+      "readme_section": "2.10"
+    }
+  ],
+  "future_server_side_keywords": {
+    "label_ja": "キーワード照合の拡張（現状の実装メモ）",
+    "steps_ja": [
+      "Next: `games/signal-trace/cases/koko-ni-iru/task-secrets.ts` と `app/api/player/validate-*` でサーバー照合済み",
+      "別案件を足すときは cases/<id>/ に task-templates・task-secrets・manifest を置き `npm run generate:games` を実行（secrets-registry / stories 等が再生成）",
+      "GAS だけで照合したい場合は従来どおり Script Properties 等も選択肢"
+    ],
+    "readme_section": "2.9"
+  }
+}

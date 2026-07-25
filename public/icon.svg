@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="180" height="180" role="img" aria-label="事件調査本部">
+  <style>
+    .bg { fill: #0a120a; }
+    .mark { fill: #e8e4dc; }
+    @media (prefers-color-scheme: light) {
+      .bg { fill: #f8f6f1; }
+      .mark { fill: #0a120a; }
+    }
+  </style>
+  <rect class="bg" width="32" height="32" rx="7" />
+  <!-- NZ モノグラム（Nazo / 調査本部） -->
+  <path
+    class="mark"
+    d="M4 25L4 7h2.5v9.5L13 7h3.5v18H14V15.5L7.5 25H4z"
+  />
+  <path
+    class="mark"
+    d="M17 7h11v3h-6l6 11v4H17v-3h6L17 11V7z"
+  />
+</svg>

@@ -1,0 +1,20 @@
+{
+  "caseId": "vault-prototype",
+  "enginePackage": "vault-prototype",
+  "engineTitle": "Vault 草稿",
+  "publicGameIds": ["vault-prototype"],
+  "adminStoryTitle": "Vault 草稿（非公開）",
+  "adminProgressView": "portal",
+  "catalog": {
+    "title": "Vault 草稿",
+    "subtitle": "非公開テスト",
+    "tagline": "published:false のため公式一覧には表示されません（ルーティングは残ります）。",
+    "status": "draft",
+    "theme": "vault-prototype",
+    "gameKind": "investigation",
+    "published": false,
+    "featured": false,
+    "sortOrder": 40,
+    "accent": "from-neutral-900 via-neutral-950 to-black"
+  }
+}

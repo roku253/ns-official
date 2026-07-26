@@ -14,7 +14,11 @@ import type {
   WorkStoryRecord,
 } from "@/lib/official/works-catalog"
 import {
+  combineStaticAndCmsStories,
+  createBlankCmsStory,
   hydrateWorksCatalogFromSources,
+  isCmsManagedStoryId,
+  isValidWorkId,
   serializeWorksCatalogForGas,
   workKeyFromStoryRecord,
 } from "@/lib/official/works-catalog"
@@ -42,6 +46,12 @@ function storyEntryOrDefaults(catalog: GasWorksCatalog, story: StoryRow): GasSto
     subtitle: st.subtitle ?? story.subtitle ?? "",
     status: st.status ?? story.status,
     coverImage: st.coverImage ?? story.coverImage ?? "",
+    externalUrl: st.externalUrl ?? story.externalUrl ?? "",
+    tokenResource: st.tokenResource ?? story.tokenResource ?? "",
+    gameKind: st.gameKind ?? story.gameKind ?? "",
+    sortOrder: st.sortOrder ?? story.sortOrder,
+    theme: st.theme ?? story.theme ?? "",
+    enginePackage: st.enginePackage ?? story.enginePackage ?? "",
     detail: {
       ...emptyDetail(),
       ...(story.detail || {}),
@@ -62,11 +72,19 @@ export default function AdminWorksCmsPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [hasCache, setHasCache] = useState(false)
+  const [newIdDraft, setNewIdDraft] = useState("")
+
+  const adminStories = useMemo(
+    () => combineStaticAndCmsStories(staticStories, catalog),
+    [staticStories, catalog]
+  )
 
   const selected = useMemo(
-    () => staticStories.find((s) => s.id === selectedId) ?? staticStories[0] ?? null,
-    [staticStories, selectedId]
+    () => adminStories.find((s) => s.id === selectedId) ?? adminStories[0] ?? null,
+    [adminStories, selectedId]
   )
+
+  const selectedIsCms = selected ? isCmsManagedStoryId(staticStories, selected.id) : false
 
   const draft = useMemo(
     () => (selected ? storyEntryOrDefaults(catalog, selected) : null),
@@ -88,6 +106,8 @@ export default function AdminWorksCmsPage() {
       setCatalog(next)
       adminCacheWrite(ADMIN_CACHE_KEYS.worksCatalog, next)
       setHasCache(true)
+      const ids = combineStaticAndCmsStories(staticStories, next).map((s) => s.id)
+      setSelectedId((prev) => (prev && ids.includes(prev) ? prev : ids[0] || ""))
     } catch {
       setError("通信に失敗しました。")
     } finally {
@@ -101,15 +121,27 @@ export default function AdminWorksCmsPage() {
       setCatalog(cached)
       setHasCache(true)
       setLoading(false)
+      const ids = combineStaticAndCmsStories(staticStories, cached).map((s) => s.id)
+      setSelectedId((prev) => (prev && ids.includes(prev) ? prev : ids[0] || ""))
     }
     void load()
-  }, [load])
+  }, [load, staticStories])
 
   function patchSelectedStory(patch: Partial<GasStoryEntry>) {
     if (!selected) return
-    const wk = workKeyFromStoryRecord(selected)
+    const wk = workKeyFromStoryRecord({
+      id: selected.id,
+      enginePackage: patch.enginePackage ?? draft?.enginePackage ?? selected.enginePackage,
+    })
     setCatalog((c) => {
       const works = { ...(c.works || {}) }
+      const oldWk = workKeyFromStoryRecord(selected)
+      if (oldWk !== wk && works[oldWk]?.stories?.[selected.id]) {
+        const oldStories = { ...(works[oldWk].stories || {}) }
+        delete oldStories[selected.id]
+        works[oldWk] = { ...works[oldWk], stories: oldStories }
+        if (Object.keys(oldStories).length === 0) delete works[oldWk]
+      }
       const prevW = { ...(works[wk] || {}), stories: { ...(works[wk]?.stories || {}) } }
       const prevS = { ...(prevW.stories![selected.id] || {}) }
       const nextS: GasStoryEntry = { ...prevS, ...patch }
@@ -117,18 +149,41 @@ export default function AdminWorksCmsPage() {
         nextS.detail = { ...(prevS.detail || {}), ...patch.detail }
       }
       prevW.stories![selected.id] = nextS
-      if (typeof patch.published === "boolean" && staticStories.filter((s) => workKeyFromStoryRecord(s) === wk).length === 1) {
-        prevW.published = patch.published
+      if (typeof patch.published === "boolean") {
+        const siblings = Object.keys(prevW.stories || {}).length
+        if (siblings <= 1) prevW.published = patch.published
       }
       works[wk] = prevW
-      return { ...c, works }
+
+      let cmsStories = { ...(c.cmsStories || {}) }
+      if (isCmsManagedStoryId(staticStories, selected.id)) {
+        const base = cmsStories[selected.id] || createBlankCmsStory(selected.id)
+        cmsStories[selected.id] = {
+          ...base,
+          title: nextS.title ?? base.title,
+          tagline: nextS.tagline ?? base.tagline,
+          subtitle: nextS.subtitle ?? base.subtitle,
+          status: nextS.status ?? base.status,
+          coverImage: nextS.coverImage ?? base.coverImage,
+          externalUrl: nextS.externalUrl ?? base.externalUrl,
+          tokenResource: nextS.tokenResource ?? base.tokenResource,
+          gameKind: nextS.gameKind ?? base.gameKind,
+          sortOrder: nextS.sortOrder ?? base.sortOrder,
+          theme: nextS.theme ?? base.theme,
+          enginePackage: nextS.enginePackage ?? base.enginePackage,
+          published: nextS.published !== false,
+          detail: nextS.detail ?? base.detail,
+        }
+      }
+
+      return { ...c, works, cmsStories: Object.keys(cmsStories).length ? cmsStories : undefined }
     })
   }
 
   function setFeatured(storyId: string) {
     setCatalog((c) => {
       const works: GasWorksCatalog["works"] = { ...(c.works || {}) }
-      for (const s of staticStories) {
+      for (const s of combineStaticAndCmsStories(staticStories, c)) {
         const wk = workKeyFromStoryRecord(s)
         const prev = works![wk] || { published: true, featuredId: null, stories: {} }
         works![wk] = {
@@ -139,6 +194,63 @@ export default function AdminWorksCmsPage() {
       }
       return { ...c, works, featuredId: storyId }
     })
+  }
+
+  function addWork() {
+    setMessage(null)
+    setError(null)
+    const id = newIdDraft.trim().toLowerCase()
+    if (!isValidWorkId(id)) {
+      setError("作品 ID は英小文字・数字・ハイフンのみ（例: my-new-work）です。")
+      return
+    }
+    if (adminStories.some((s) => s.id === id)) {
+      setError("同じ ID の作品が既にあります。")
+      return
+    }
+    const blank = createBlankCmsStory(id)
+    setCatalog((c) => {
+      const cmsStories = { ...(c.cmsStories || {}), [id]: blank }
+      const next = hydrateWorksCatalogFromSources(staticStories, { ...c, cmsStories })
+      return next
+    })
+    setSelectedId(id)
+    setNewIdDraft("")
+    setMessage(`「${id}」を追加しました。内容を編集して保存してください。`)
+  }
+
+  function removeSelectedCmsWork() {
+    if (!selected || !selectedIsCms) return
+    if (!window.confirm(`「${selected.title || selected.id}」を一覧から削除しますか？（保存するまで本番には反映されません）`)) {
+      return
+    }
+    const removeId = selected.id
+    setCatalog((c) => {
+      const cmsStories = { ...(c.cmsStories || {}) }
+      delete cmsStories[removeId]
+      const works = { ...(c.works || {}) }
+      for (const [wk, we] of Object.entries(works)) {
+        if (!we.stories?.[removeId]) continue
+        const stories = { ...we.stories }
+        delete stories[removeId]
+        if (Object.keys(stories).length === 0) delete works[wk]
+        else works[wk] = { ...we, stories }
+      }
+      const overrides = { ...(c.overrides || {}) }
+      delete overrides[removeId]
+      return {
+        ...c,
+        cmsStories: Object.keys(cmsStories).length ? cmsStories : undefined,
+        works,
+        overrides: Object.keys(overrides).length ? overrides : undefined,
+        featuredId: c.featuredId === removeId ? null : c.featuredId,
+      }
+    })
+    setSelectedId((prev) => {
+      const rest = adminStories.filter((s) => s.id !== removeId)
+      return rest[0]?.id || ""
+    })
+    setMessage("削除を反映するには「保存」を押してください。")
   }
 
   async function save() {
@@ -180,7 +292,7 @@ export default function AdminWorksCmsPage() {
   return (
     <AdminConsoleShell
       title="作品"
-      description="公開・詳細CMS"
+      description="追加・公開・詳細・プレイ先"
       toolbar={
         loading && hasCache ? (
           <span className="text-[11px] text-[#8b949e]">更新中…</span>
@@ -207,7 +319,7 @@ export default function AdminWorksCmsPage() {
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
-          <aside className="space-y-2 border border-[#30363d] bg-[#161b22] p-3">
+          <aside className="space-y-3 border border-[#30363d] bg-[#161b22] p-3">
             <p
               className="text-[10px] uppercase tracking-wider text-[#8b949e]"
               style={{ fontFamily: 'var(--font-admin-mono), "IBM Plex Mono", monospace' }}
@@ -215,10 +327,11 @@ export default function AdminWorksCmsPage() {
               作品一覧
             </p>
             <ul className="space-y-0.5">
-              {staticStories.map((s) => {
+              {adminStories.map((s) => {
                 const wk = workKeyFromStoryRecord(s)
                 const on = catalog.works?.[wk]?.stories?.[s.id]?.published !== false
                 const active = selected?.id === s.id
+                const cms = isCmsManagedStoryId(staticStories, s.id)
                 return (
                   <li key={s.id}>
                     <button
@@ -231,12 +344,13 @@ export default function AdminWorksCmsPage() {
                           : "border-transparent text-[#c9d1d9] hover:border-[#30363d] hover:bg-[#21262d]"
                       )}
                     >
-                      <span className="font-medium">{s.title}</span>
+                      <span className="font-medium">{catalog.works?.[wk]?.stories?.[s.id]?.title || s.title}</span>
                       <span
                         className="text-[10px] text-[#8b949e]"
                         style={{ fontFamily: 'var(--font-admin-mono), "IBM Plex Mono", monospace' }}
                       >
                         {s.id}
+                        {cms ? " · CMS" : ""}
                       </span>
                       <span className={cn("text-[10px]", on ? "text-[#3fb950]" : "text-[#8b949e]")}>
                         {on ? "公開" : "非公開"}
@@ -246,6 +360,22 @@ export default function AdminWorksCmsPage() {
                 )
               })}
             </ul>
+
+            <div className="space-y-2 border-t border-[#30363d] pt-3">
+              <Label className="text-[11px] text-[#8b949e]">新規作品 ID</Label>
+              <Input
+                value={newIdDraft}
+                onChange={(e) => setNewIdDraft(e.target.value)}
+                placeholder="my-new-work"
+                className={cn(fieldClass, "font-mono text-xs")}
+              />
+              <button type="button" onClick={addWork} className={cn(adminBtnClass(), "w-full")}>
+                作品を追加
+              </button>
+              <p className="text-[11px] leading-relaxed text-[#8b949e]">
+                ゲーム本体は別デプロイのまま、公式の一覧・詳細・プレイ先だけここで管理します。
+              </p>
+            </div>
           </aside>
 
           {selected && draft ? (
@@ -270,6 +400,17 @@ export default function AdminWorksCmsPage() {
                   />
                   トップおすすめ
                 </label>
+                {selectedIsCms ? (
+                  <button
+                    type="button"
+                    onClick={removeSelectedCmsWork}
+                    className="ml-auto text-[12px] text-[#f85149] hover:underline"
+                  >
+                    この作品を削除
+                  </button>
+                ) : (
+                  <span className="ml-auto text-[11px] text-[#8b949e]">リポジトリ同梱（削除不可）</span>
+                )}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -307,11 +448,65 @@ export default function AdminWorksCmsPage() {
                   />
                 </div>
                 <div className="space-y-1.5">
+                  <Label className="text-[11px] text-[#8b949e]">種類 (gameKind)</Label>
+                  <Input
+                    value={draft.gameKind || ""}
+                    onChange={(e) => patchSelectedStory({ gameKind: e.target.value })}
+                    placeholder="investigation"
+                    className={fieldClass}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-[#8b949e]">並び順 (小さいほど上)</Label>
+                  <Input
+                    type="number"
+                    value={draft.sortOrder ?? ""}
+                    onChange={(e) => {
+                      const n = e.target.value === "" ? undefined : Number(e.target.value)
+                      patchSelectedStory({
+                        sortOrder: Number.isFinite(n as number) ? Math.floor(n as number) : undefined,
+                      })
+                    }}
+                    className={fieldClass}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] text-[#8b949e]">enginePackage</Label>
+                  <Input
+                    value={draft.enginePackage || ""}
+                    onChange={(e) => patchSelectedStory({ enginePackage: e.target.value.trim() })}
+                    placeholder="signal-trace など"
+                    className={cn(fieldClass, "font-mono text-xs")}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-[11px] text-[#8b949e]">
+                    プレイ先 URL（推奨: 作品の本番 URL。空なら公式の既定 /play/…）
+                  </Label>
+                  <Input
+                    value={draft.externalUrl || ""}
+                    onChange={(e) => patchSelectedStory({ externalUrl: e.target.value.trim() })}
+                    placeholder="https://example.vercel.app/play/my-work"
+                    className={cn(fieldClass, "font-mono text-xs")}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-[11px] text-[#8b949e]">
+                    tokenResource（任意。設定時はプレイ時にアクセストークン付与）
+                  </Label>
+                  <Input
+                    value={draft.tokenResource || ""}
+                    onChange={(e) => patchSelectedStory({ tokenResource: e.target.value.trim() })}
+                    placeholder="ext:…"
+                    className={cn(fieldClass, "font-mono text-xs")}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-[11px] text-[#8b949e]">カバー画像 URL</Label>
                   <Input
                     value={draft.coverImage || ""}
                     onChange={(e) => patchSelectedStory({ coverImage: e.target.value })}
-                    placeholder="/games/signal-trace/cover-….webp"
+                    placeholder="https://… または /games/…/cover.webp"
                     className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>
@@ -407,7 +602,7 @@ export default function AdminWorksCmsPage() {
               </div>
             </section>
           ) : (
-            <p className="text-[13px] text-[#8b949e]">編集できる作品がありません。</p>
+            <p className="text-[13px] text-[#8b949e]">編集できる作品がありません。左から追加してください。</p>
           )}
         </div>
       )}

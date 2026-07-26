@@ -103,6 +103,11 @@ export function PlayThisWorkButton({
           }
           return
         }
+        if (ext) {
+          window.localStorage.setItem(LS_ACCOUNT.CASE_ID, workId)
+          navigateWithOfficialLeaveLoader(ext)
+          return
+        }
         setActiveWorkAndOpenPortal(workId)
       }}
     >
@@ -139,6 +144,11 @@ export function PlayThisWorkTextLink({
         if (ext && resKey) {
           const r = await openExternalWithToken(workId, ext, resKey)
           if (!r.ok) window.alert(r.message || "エラー")
+          return
+        }
+        if (ext) {
+          window.localStorage.setItem(LS_ACCOUNT.CASE_ID, workId)
+          navigateWithOfficialLeaveLoader(ext)
           return
         }
         setActiveWorkAndOpenPortal(workId)

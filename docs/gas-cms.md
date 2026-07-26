@@ -1,6 +1,6 @@
 # 公式 CMS（お知らせ・作品カタログ）GAS 連携
 
-運営コンソールからお知らせと作品詳細をデプロイなしで更新するための契約です。
+運営コンソールからお知らせと作品をデプロイなしで更新するための契約です。
 
 ## 必要なアクション
 
@@ -10,7 +10,7 @@
 | `adminGetNews` | `adminKey` | 同上（下書き含む全件） |
 | `adminSetNews` | `adminKey` | body.`news` を保存 |
 | `publicGetWorksCatalog` | 不要 | 既存。JSON を丸ごと返す（未知キーを落とさない） |
-| `adminGetWorksCatalog` / `adminSetWorksCatalog` | `adminKey` | 既存。詳細上書きフィールドを保持 |
+| `adminGetWorksCatalog` / `adminSetWorksCatalog` | `adminKey` | 既存。`cmsStories` など未知キーを保持 |
 
 ## NewsItem
 
@@ -27,12 +27,27 @@
 
 `published: false` は運営下書き。公開サイトには出ません。
 
-## 作品カタログの拡張フィールド
+## 作品カタログ
 
-`works.<engine>.stories.<caseId>`（およびレガシー `overrides.<caseId>`）に:
+### コンソールでできること（`/admin/works`）
+
+- **新規追加**（ID を指定して CMS 作品を作成）
+- **削除**（CMS 追加分のみ。リポジトリ同梱の `ここにいる` 等は非公開のみ）
+- 公開オンオフ・トップおすすめ
+- タイトル / 詳細 / カバー・スクショ URL
+- **プレイ先 URL**（作品アプリの本番 URL。空なら公式の既定 `/play/…`）
+
+ゲーム本体の ZIP アップロードはしません。作品アプリは別デプロイし、公式には「一覧メタ + プレイ先」だけ載せます。
+
+### 保存フィールド
+
+`works.<engine>.stories.<caseId>` およびレガシー `overrides.<caseId>`:
 
 - `title` / `tagline` / `subtitle` / `status` / `coverImage`
+- `externalUrl` / `tokenResource` / `gameKind` / `sortOrder` / `theme` / `enginePackage`
 - `detail`: `{ estimatedPlayMinutesMin, estimatedPlayMinutesMax, genres[], longDescription[], screenshots[{src,alt}] }`
+
+コンソール追加作品のフル定義は `cmsStories.<caseId>` にも保持します（静的 `stories.json` に無い ID）。
 
 既存の公開フラグ・`featuredId` はそのままです。
 
@@ -41,13 +56,12 @@
 1. GAS エディタの `コード.gs` を [gas/コード.gs](../gas/コード.gs) の内容で置き換える（ファイル全体をコピー＆ペースト）
 2. ウェブアプリとして再デプロイ（新しいデプロイ URL が発行されたら Vercel / `.env` の GAS URL を更新）
 3. `/admin/news` で保存 → 公式 `/news` をリロードして反映を確認
-4. `/admin/works` で詳細を保存 → 作品詳細ページで反映を確認
+4. `/admin/works` で作品を追加・保存 → 一覧・詳細・プレイ先を確認
 
-保存先は `NSPlatform` シートの `key=news`（`works_catalog` と同じ key/value 方式）。
+保存先は `NSPlatform` シートの `key=news` / `works_catalog`（同じ key/value 方式）。
 
 断片だけ欲しい場合は [gas/cms-actions.gs](../gas/cms-actions.gs) を参照（統合済み本体は `gas/コード.gs`）。
 
-
 ## フォールバック
 
-GAS 未対応・通信失敗時、公式サイトは `data/official/news.json` と静的 `stories.json` を使います。
+GAS 未対応・通信失敗時、公式サイトは `data/official/news.json` と静的 `stories.json` を使います（CMS 追加作品は GAS 必須）。

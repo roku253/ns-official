@@ -69,6 +69,13 @@ export type GasStoryEntry = {
   status?: string
   coverImage?: string
   detail?: WorkDetailRecord
+  /** プレイ遷移先（絶対URLまたは /play/...）。未設定時は既定ルーティング */
+  externalUrl?: string
+  tokenResource?: string
+  gameKind?: string
+  sortOrder?: number
+  theme?: string
+  enginePackage?: string
 }
 
 export type GasWorkEntry = {
@@ -86,8 +93,26 @@ export type GasWorksCatalog = {
   /** レガシー: story id ごとの表示名上書き（詳細は works.stories 側を正） */
   overrides?: Record<
     string,
-    { title?: string; tagline?: string; subtitle?: string; status?: string; coverImage?: string; detail?: WorkDetailRecord }
+    {
+      title?: string
+      tagline?: string
+      subtitle?: string
+      status?: string
+      coverImage?: string
+      detail?: WorkDetailRecord
+      externalUrl?: string
+      tokenResource?: string
+      gameKind?: string
+      sortOrder?: number
+      theme?: string
+      enginePackage?: string
+    }
   > | null
+  /**
+   * コンソールで追加した作品のフル定義（静的 stories.json に無い id）。
+   * 公開一覧は静的 + こことマージする。
+   */
+  cmsStories?: Record<string, WorkStoryRecord> | null
 }
 
 export type MergedWorkItem = WorkStoryRecord & {
@@ -117,6 +142,12 @@ function displayOverridesForStory(
   status?: string
   coverImage?: string
   detail?: WorkDetailRecord
+  externalUrl?: string
+  tokenResource?: string
+  gameKind?: string
+  sortOrder?: number
+  theme?: string
+  enginePackage?: string
 } {
   const top = gasCatalog?.overrides?.[s.id] || {}
   const wk = workKeyFromStoryRecord(s)
@@ -128,6 +159,12 @@ function displayOverridesForStory(
     status: nest?.status,
     coverImage: nest?.coverImage,
     detail: nest?.detail,
+    externalUrl: nest?.externalUrl,
+    tokenResource: nest?.tokenResource,
+    gameKind: nest?.gameKind,
+    sortOrder: nest?.sortOrder,
+    theme: nest?.theme,
+    enginePackage: nest?.enginePackage,
   }
   const strings = Object.fromEntries(
     Object.entries({
@@ -136,6 +173,11 @@ function displayOverridesForStory(
       subtitle: fromNest.subtitle ?? top.subtitle,
       status: fromNest.status ?? top.status,
       coverImage: fromNest.coverImage ?? top.coverImage,
+      externalUrl: fromNest.externalUrl ?? top.externalUrl,
+      tokenResource: fromNest.tokenResource ?? top.tokenResource,
+      gameKind: fromNest.gameKind ?? top.gameKind,
+      theme: fromNest.theme ?? top.theme,
+      enginePackage: fromNest.enginePackage ?? top.enginePackage,
     }).filter(([, v]) => typeof v === "string" && v.trim().length > 0)
   ) as {
     title?: string
@@ -143,9 +185,20 @@ function displayOverridesForStory(
     subtitle?: string
     status?: string
     coverImage?: string
+    externalUrl?: string
+    tokenResource?: string
+    gameKind?: string
+    theme?: string
+    enginePackage?: string
   }
+  const sortOrder =
+    typeof fromNest.sortOrder === "number"
+      ? fromNest.sortOrder
+      : typeof top.sortOrder === "number"
+        ? top.sortOrder
+        : undefined
   const detail = mergeWorkDetail(s.detail, fromNest.detail ?? top.detail)
-  return { ...strings, detail }
+  return { ...strings, detail, sortOrder }
 }
 
 /** GAS 上書きを静的 detail に重ねる。配列・数値は上書き側が定義されていれば置換 */
@@ -197,6 +250,12 @@ function applyStoryOverridesToRecord(
     status: o.status ?? s.status,
     coverImage: o.coverImage ?? s.coverImage,
     detail: o.detail ?? s.detail,
+    externalUrl: o.externalUrl ?? s.externalUrl,
+    tokenResource: o.tokenResource ?? s.tokenResource,
+    gameKind: o.gameKind ?? s.gameKind,
+    theme: o.theme ?? s.theme,
+    enginePackage: o.enginePackage ?? s.enginePackage,
+    sortOrder: o.sortOrder ?? s.sortOrder,
     displayTitle: o.title ?? s.title,
     displayTagline: o.tagline ?? s.tagline ?? "",
     displaySubtitle: o.subtitle ?? s.subtitle,
@@ -241,11 +300,116 @@ export function mergeWorksCatalog(
   staticWorks: WorkStoryRecord[],
   gasCatalog: GasWorksCatalog | null | undefined
 ): MergedWorkItem[] {
-  const list = staticWorks.filter((s) => isStoryVisibleOnPublicSite(s, gasCatalog))
+  const list = combineStaticAndCmsStories(staticWorks, gasCatalog).filter((s) =>
+    isStoryVisibleOnPublicSite(s, gasCatalog)
+  )
 
   return list
     .map((s) => applyStoryOverridesToRecord(s, gasCatalog))
     .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+}
+
+/** 静的 stories + コンソール追加分 */
+export function combineStaticAndCmsStories(
+  staticWorks: WorkStoryRecord[],
+  gasCatalog: GasWorksCatalog | null | undefined
+): WorkStoryRecord[] {
+  const byId = new Map<string, WorkStoryRecord>()
+  for (const s of staticWorks) byId.set(s.id, s)
+  const cms = gasCatalog?.cmsStories
+  if (cms && typeof cms === "object") {
+    for (const raw of Object.values(cms)) {
+      const n = normalizeCmsStoryRecord(raw)
+      if (!n) continue
+      if (!byId.has(n.id)) byId.set(n.id, n)
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
+}
+
+export function isCmsManagedStoryId(
+  staticWorks: WorkStoryRecord[],
+  storyId: string
+): boolean {
+  return !staticWorks.some((s) => s.id === storyId)
+}
+
+export function normalizeCmsStoryRecord(raw: unknown): WorkStoryRecord | null {
+  if (!raw || typeof raw !== "object") return null
+  const o = raw as Record<string, unknown>
+  const id = typeof o.id === "string" ? o.id.trim() : ""
+  const title = typeof o.title === "string" ? o.title.trim() : ""
+  if (!id || !title) return null
+  const theme = typeof o.theme === "string" && o.theme.trim() ? o.theme.trim() : "general"
+  const status = typeof o.status === "string" && o.status.trim() ? o.status.trim() : "preview"
+  const record: WorkStoryRecord = {
+    id,
+    title,
+    status,
+    theme,
+    published: o.published !== false,
+  }
+  if (typeof o.enginePackage === "string" && o.enginePackage.trim()) {
+    record.enginePackage = o.enginePackage.trim()
+  }
+  if (typeof o.tagline === "string") record.tagline = o.tagline
+  if (typeof o.subtitle === "string") record.subtitle = o.subtitle
+  if (typeof o.coverImage === "string") record.coverImage = o.coverImage
+  if (typeof o.gameKind === "string" && o.gameKind.trim()) record.gameKind = o.gameKind.trim()
+  if (typeof o.externalUrl === "string") record.externalUrl = o.externalUrl.trim()
+  if (typeof o.tokenResource === "string") record.tokenResource = o.tokenResource.trim()
+  if (typeof o.accent === "string") record.accent = o.accent
+  if (typeof o.sortOrder === "number" && Number.isFinite(o.sortOrder)) {
+    record.sortOrder = Math.floor(o.sortOrder)
+  }
+  if (typeof o.featured === "boolean") record.featured = o.featured
+  if (o.detail && typeof o.detail === "object") {
+    record.detail = mergeWorkDetail(undefined, o.detail as WorkDetailRecord)
+  }
+  return record
+}
+
+const WORK_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
+
+export function isValidWorkId(id: string): boolean {
+  return WORK_ID_RE.test(id) && id.length >= 2 && id.length <= 64
+}
+
+export function createBlankCmsStory(id: string): WorkStoryRecord {
+  return {
+    id,
+    title: "新しい作品",
+    status: "preview",
+    theme: "general",
+    published: false,
+    sortOrder: 100,
+    tagline: "",
+    subtitle: "",
+    coverImage: "",
+    enginePackage: id,
+    externalUrl: "",
+    gameKind: "investigation",
+    detail: {
+      genres: [],
+      longDescription: [],
+      screenshots: [],
+    },
+  }
+}
+
+/** cmsStories を正規化したカタログ断片 */
+function normalizeCmsStoriesMap(
+  raw: GasWorksCatalog["cmsStories"]
+): Record<string, WorkStoryRecord> {
+  const out: Record<string, WorkStoryRecord> = {}
+  if (!raw || typeof raw !== "object") return out
+  for (const [key, val] of Object.entries(raw)) {
+    const n = normalizeCmsStoryRecord(val)
+    if (!n) continue
+    const id = n.id || key
+    out[id] = { ...n, id }
+  }
+  return out
 }
 
 /** ヒーロー枠: GAS の featured → 静的 featured フラグ → sort 先頭（＝最新扱い） */
@@ -338,7 +502,7 @@ export function engineStoriesForWorkDetail(
   const eng = (current.enginePackage || "").trim()
   if (!eng) return [current]
 
-  const roster = staticWorks
+  const roster = combineStaticAndCmsStories(staticWorks, gasCatalog)
     .filter((s) => (s.enginePackage || "").trim() === eng)
     .filter((s) => s.id === current.id || isStoryVisibleOnPublicSite(s, gasCatalog))
     .sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999))
@@ -462,7 +626,9 @@ export function hydrateWorksCatalogFromSources(
   raw: GasWorksCatalog | null | undefined
 ): GasWorksCatalog {
   const gas = raw && typeof raw === "object" ? { ...raw } : {}
-  const groups = groupStaticStoriesByWorkKey(staticWorks)
+  const cmsStories = normalizeCmsStoriesMap(gas.cmsStories)
+  const allStories = combineStaticAndCmsStories(staticWorks, { ...gas, cmsStories })
+  const groups = groupStaticStoriesByWorkKey(allStories)
 
   if (gasCatalogUsesNestedWorks(gas)) {
     const works: Record<string, GasWorkEntry> = { ...(gas.works as Record<string, GasWorkEntry>) }
@@ -476,6 +642,18 @@ export function hydrateWorksCatalogFromSources(
         stories[s.id] = {
           ...prev,
           published,
+          title: prev.title ?? s.title,
+          tagline: prev.tagline ?? s.tagline,
+          subtitle: prev.subtitle ?? s.subtitle,
+          status: prev.status ?? s.status,
+          coverImage: prev.coverImage ?? s.coverImage,
+          detail: prev.detail ?? s.detail,
+          externalUrl: prev.externalUrl ?? s.externalUrl,
+          tokenResource: prev.tokenResource ?? s.tokenResource,
+          gameKind: prev.gameKind ?? s.gameKind,
+          sortOrder: prev.sortOrder ?? s.sortOrder,
+          theme: prev.theme ?? s.theme,
+          enginePackage: prev.enginePackage ?? s.enginePackage,
         }
       }
       works[wk] = {
@@ -486,11 +664,12 @@ export function hydrateWorksCatalogFromSources(
     }
     const merged: GasWorksCatalog = {
       ...gas,
+      cmsStories: Object.keys(cmsStories).length > 0 ? cmsStories : undefined,
       works,
       featuredId:
         gas.featuredId ??
-        staticWorks.find((x) => x.featured)?.id ??
-        staticWorks[0]?.id ??
+        allStories.find((x) => x.featured)?.id ??
+        allStories[0]?.id ??
         null,
     }
     syncSingleStoryWorkEntries(merged, groups)
@@ -508,12 +687,18 @@ export function hydrateWorksCatalogFromSources(
       const o = gas.overrides?.[s.id]
       stories[s.id] = {
         published,
-        ...(o?.title ? { title: o.title } : {}),
-        ...(o?.tagline ? { tagline: o.tagline } : {}),
-        ...(o?.subtitle ? { subtitle: o.subtitle } : {}),
-        ...(o?.status ? { status: o.status } : {}),
-        ...(o?.coverImage ? { coverImage: o.coverImage } : {}),
-        ...(o?.detail ? { detail: o.detail } : {}),
+        title: o?.title ?? s.title,
+        tagline: o?.tagline ?? s.tagline,
+        subtitle: o?.subtitle ?? s.subtitle,
+        status: o?.status ?? s.status,
+        coverImage: o?.coverImage ?? s.coverImage,
+        detail: o?.detail ?? s.detail,
+        externalUrl: o?.externalUrl ?? s.externalUrl,
+        tokenResource: o?.tokenResource ?? s.tokenResource,
+        gameKind: o?.gameKind ?? s.gameKind,
+        sortOrder: o?.sortOrder ?? s.sortOrder,
+        theme: o?.theme ?? s.theme,
+        enginePackage: o?.enginePackage ?? s.enginePackage,
       }
     }
     const featuredInWork =
@@ -531,8 +716,9 @@ export function hydrateWorksCatalogFromSources(
 
   const out: GasWorksCatalog = {
     works,
+    cmsStories: Object.keys(cmsStories).length > 0 ? cmsStories : undefined,
     featuredId:
-      gas.featuredId ?? staticWorks.find((x) => x.featured)?.id ?? staticWorks[0]?.id ?? null,
+      gas.featuredId ?? allStories.find((x) => x.featured)?.id ?? allStories[0]?.id ?? null,
     overrides: gas.overrides ?? undefined,
   }
 
@@ -540,24 +726,88 @@ export function hydrateWorksCatalogFromSources(
   return out
 }
 
+function storyEntryToOverrideText(st: GasStoryEntry): NonNullable<GasWorksCatalog["overrides"]>[string] {
+  const text: NonNullable<GasWorksCatalog["overrides"]>[string] = {}
+  if (st.title) text.title = st.title
+  if (st.tagline) text.tagline = st.tagline
+  if (st.subtitle) text.subtitle = st.subtitle
+  if (st.status) text.status = st.status
+  if (st.coverImage) text.coverImage = st.coverImage
+  if (st.detail && typeof st.detail === "object") text.detail = st.detail
+  if (st.externalUrl) text.externalUrl = st.externalUrl
+  if (st.tokenResource) text.tokenResource = st.tokenResource
+  if (st.gameKind) text.gameKind = st.gameKind
+  if (typeof st.sortOrder === "number") text.sortOrder = st.sortOrder
+  if (st.theme) text.theme = st.theme
+  if (st.enginePackage) text.enginePackage = st.enginePackage
+  return text
+}
+
 /** 管理画面保存用: 表示テキスト・詳細上書きをトップレベル overrides に寄せ、本体は v2 works を送る */
 export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: GasWorksCatalog): GasWorksCatalog {
   const hydrated = hydrateWorksCatalogFromSources(staticWorks, ui)
   const overrides: NonNullable<GasWorksCatalog["overrides"]> = { ...(hydrated.overrides || {}) }
+  const allStories = combineStaticAndCmsStories(staticWorks, hydrated)
 
-  for (const s of staticWorks) {
+  for (const s of allStories) {
     const wk = workKeyFromStoryRecord(s)
     const st = hydrated.works?.[wk]?.stories?.[s.id]
     if (!st) continue
-    const text: NonNullable<GasWorksCatalog["overrides"]>[string] = {}
-    if (st.title) text.title = st.title
-    if (st.tagline) text.tagline = st.tagline
-    if (st.subtitle) text.subtitle = st.subtitle
-    if (st.status) text.status = st.status
-    if (st.coverImage) text.coverImage = st.coverImage
-    if (st.detail && typeof st.detail === "object") text.detail = st.detail
+    const text = storyEntryToOverrideText(st)
     if (Object.keys(text).length > 0) {
       overrides[s.id] = { ...(overrides[s.id] || {}), ...text }
+    }
+  }
+
+  const cmsStories: Record<string, WorkStoryRecord> = {}
+  for (const [id, base] of Object.entries(hydrated.cmsStories || {})) {
+    if (!isCmsManagedStoryId(staticWorks, id)) continue
+    const wk = workKeyFromStoryRecord(base)
+    const st = hydrated.works?.[wk]?.stories?.[id]
+    const merged = applyStoryOverridesToRecord(base, hydrated)
+    cmsStories[id] = {
+      id,
+      title: merged.title,
+      status: merged.status || "preview",
+      theme: merged.theme || "general",
+      published: st?.published !== false,
+      enginePackage: merged.enginePackage,
+      tagline: merged.tagline,
+      subtitle: merged.subtitle,
+      coverImage: merged.coverImage,
+      gameKind: merged.gameKind,
+      externalUrl: merged.externalUrl,
+      tokenResource: merged.tokenResource,
+      accent: merged.accent,
+      sortOrder: merged.sortOrder,
+      featured: hydrated.featuredId === id,
+      detail: merged.detail,
+    }
+  }
+
+  // works から静的に無い story も cms に残す（cmsStories 欠落の救済）
+  for (const [wk, we] of Object.entries(hydrated.works || {})) {
+    for (const sid of Object.keys(we.stories || {})) {
+      if (!isCmsManagedStoryId(staticWorks, sid)) continue
+      if (cmsStories[sid]) continue
+      const st = we.stories![sid]!
+      const seed = createBlankCmsStory(sid)
+      cmsStories[sid] = {
+        ...seed,
+        enginePackage: st.enginePackage || wk,
+        title: st.title || seed.title,
+        tagline: st.tagline,
+        subtitle: st.subtitle,
+        status: st.status || seed.status,
+        coverImage: st.coverImage,
+        gameKind: st.gameKind,
+        externalUrl: st.externalUrl,
+        tokenResource: st.tokenResource,
+        theme: st.theme || seed.theme,
+        sortOrder: st.sortOrder,
+        published: st.published !== false,
+        detail: st.detail,
+      }
     }
   }
 
@@ -565,5 +815,6 @@ export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: 
     featuredId: hydrated.featuredId ?? null,
     overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
     works: hydrated.works,
+    cmsStories: Object.keys(cmsStories).length > 0 ? cmsStories : undefined,
   }
 }

@@ -218,7 +218,13 @@ function WorksCatalogMain({
                         >
                           詳細 <ArrowRight className="h-3.5 w-3.5" aria-hidden />
                         </Link>
-                        <PlayThisWorkTextLink workId={s.id} sessionOk={sessionOk} className={enterClass}>
+                        <PlayThisWorkTextLink
+                          workId={s.id}
+                          sessionOk={sessionOk}
+                          className={enterClass}
+                          externalUrl={s.externalUrl}
+                          tokenResource={s.tokenResource}
+                        >
                           Enter <Play className="h-3.5 w-3.5 fill-current" aria-hidden />
                         </PlayThisWorkTextLink>
                       </div>

@@ -24,7 +24,7 @@ git add -A && git commit -m "..." && git push
 npx vercel --prod
 ```
 
-環境変数: `GAS_*`, `ADMIN_PORTAL_KEY`（Claude は公式には不要）
+環境変数: `GAS_*`, `ADMIN_PORTAL_KEY`, 画像UP用 `BLOB_READ_WRITE_TOKEN`（Claude は公式には不要）
 
 ## 作品アプリ
 

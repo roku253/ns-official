@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { AdminConsoleShell, adminBtnClass } from "@/components/admin/admin-console-shell"
+import { AdminImageDropzone } from "@/components/admin/admin-image-dropzone"
 import { ADMIN_CACHE_KEYS, adminCacheRead, adminCacheWrite } from "@/lib/admin/admin-cache"
 import stories from "@/data/official/stories.json"
 import type {
@@ -283,9 +284,6 @@ export default function AdminWorksCmsPage() {
   const detail = draft?.detail || emptyDetail()
   const genresText = (detail.genres || []).join(", ")
   const longText = (detail.longDescription || []).join("\n\n")
-  const shotsText = (detail.screenshots || [])
-    .map((s) => (s.alt ? `${s.src} | ${s.alt}` : s.src))
-    .join("\n")
 
   const showSkeleton = loading && !hasCache
 
@@ -502,11 +500,17 @@ export default function AdminWorksCmsPage() {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-[11px] text-[#8b949e]">カバー画像 URL</Label>
+                  <Label className="text-[11px] text-[#8b949e]">カバー画像</Label>
+                  <AdminImageDropzone
+                    workId={selected.id}
+                    kind="cover"
+                    value={draft.coverImage || ""}
+                    onChange={(url) => patchSelectedStory({ coverImage: url })}
+                  />
                   <Input
                     value={draft.coverImage || ""}
                     onChange={(e) => patchSelectedStory({ coverImage: e.target.value })}
-                    placeholder="https://… または /games/…/cover.webp"
+                    placeholder="または URL を直接入力"
                     className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>
@@ -576,27 +580,14 @@ export default function AdminWorksCmsPage() {
                   />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-[11px] text-[#8b949e]">
-                    スクリーンショット（1行1枚: URL または URL | alt）
-                  </Label>
-                  <Textarea
-                    value={shotsText}
-                    rows={5}
-                    onChange={(e) => {
-                      const screenshots = e.target.value
-                        .split("\n")
-                        .map((line) => line.trim())
-                        .filter(Boolean)
-                        .map((line) => {
-                          const [srcPart, ...altParts] = line.split("|")
-                          const src = (srcPart || "").trim()
-                          const alt = altParts.join("|").trim()
-                          return alt ? { src, alt } : { src }
-                        })
-                        .filter((s) => s.src)
+                  <Label className="text-[11px] text-[#8b949e]">スクリーンショット</Label>
+                  <AdminImageDropzone
+                    workId={selected.id}
+                    kind="screenshot"
+                    values={detail.screenshots || []}
+                    onChangeMany={(screenshots) =>
                       patchSelectedStory({ detail: { ...detail, screenshots } })
-                    }}
-                    className={cn(fieldClass, "font-mono text-xs")}
+                    }
                   />
                 </div>
               </div>

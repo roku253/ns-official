@@ -19,7 +19,10 @@ import {
 } from "@/components/official-site/scroll-reveal"
 import { WORKS_CATALOG_PATH } from "@/lib/routes"
 import { formatNewsDate, type NewsItem } from "@/lib/official/news"
-import { fetchPublishedNewsItems } from "@/lib/official/fetch-public-news"
+import {
+  fetchPublishedNewsItems,
+  getCachedPublishedNewsItems,
+} from "@/lib/official/fetch-public-news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 import type { GasWorksCatalog, MergedWorkItem } from "@/lib/official/works-catalog"
 import {
@@ -231,12 +234,12 @@ function CasesSection({
 /* ── News ────────────────────────────────────────────────── */
 
 function NewsSection() {
-  const [items, setItems] = useState<NewsItem[]>([])
+  const [items, setItems] = useState<NewsItem[]>(() => getCachedPublishedNewsItems().slice(0, 3))
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const next = await fetchPublishedNewsItems()
+      const next = await fetchPublishedNewsItems({ force: true })
       if (!cancelled) setItems(next.slice(0, 3))
     })()
     return () => {

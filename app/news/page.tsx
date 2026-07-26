@@ -1,26 +1,25 @@
 "use client"
 
-import { Suspense, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { OfficialLoadingScreen } from "@/components/official-site/official-loading-screen"
 import { OfficialSiteHeader } from "@/components/official-site/official-site-header"
 import { OfficialSitePortalFooter } from "@/components/official-site/official-site-portal-footer"
-import { fetchPublishedNewsItems } from "@/lib/official/fetch-public-news"
+import {
+  fetchPublishedNewsItems,
+  getCachedPublishedNewsItems,
+} from "@/lib/official/fetch-public-news"
 import { formatNewsDate, type NewsItem } from "@/lib/official/news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 
 function NewsMain() {
-  const [items, setItems] = useState<NewsItem[]>([])
-  const [loadingNews, setLoadingNews] = useState(true)
+  const [items, setItems] = useState<NewsItem[]>(() => getCachedPublishedNewsItems())
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const next = await fetchPublishedNewsItems()
-      if (!cancelled) {
-        setItems(next)
-        setLoadingNews(false)
-      }
+      const next = await fetchPublishedNewsItems({ force: true })
+      if (!cancelled) setItems(next)
     })()
     return () => {
       cancelled = true
@@ -39,9 +38,7 @@ function NewsMain() {
           </h1>
 
           <div className="mt-12 space-y-10">
-            {loadingNews && items.length === 0 ? (
-              <p className="text-sm leading-[2] text-zinc-500">読み込み中…</p>
-            ) : items.length === 0 ? (
+            {items.length === 0 ? (
               <p className="text-sm leading-[2] text-zinc-500">
                 現在、掲載中のお知らせはありません。
               </p>
@@ -95,13 +92,7 @@ export default function NewsPage() {
   return (
     <div className="official-portal-surface flex min-h-screen flex-col bg-[#0a0c10] text-zinc-200 antialiased">
       <OfficialSiteHeader sessionOk={sessionOk} mergedWorks={mergedWorks} />
-      <Suspense
-        fallback={
-          <main className="px-4 py-16 text-sm text-zinc-500 md:px-6">読み込み中…</main>
-        }
-      >
-        <NewsMain />
-      </Suspense>
+      <NewsMain />
     </div>
   )
 }

@@ -13,6 +13,7 @@ import {
   type NewsCatalog,
   type NewsItem,
 } from "@/lib/official/news"
+import { clearPublicNewsCache } from "@/lib/official/fetch-public-news"
 import { cn } from "@/lib/utils"
 
 function blankItem(): NewsItem {
@@ -145,6 +146,7 @@ export default function AdminNewsPage() {
       const next = data.news ? normalizeNewsCatalog(data.news) : payload
       setCatalog(next)
       adminCacheWrite(ADMIN_CACHE_KEYS.news, next)
+      clearPublicNewsCache()
       setMessage(data.message || "保存しました。公式 /news は再デプロイなしで反映されます。")
     } catch {
       setError("通信に失敗しました。")

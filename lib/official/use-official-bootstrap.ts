@@ -7,6 +7,7 @@ import type { GasWorksCatalog, MergedWorkItem, WorkStoryRecord } from "@/lib/off
 import { mergeWorksCatalog } from "@/lib/official/works-catalog"
 import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
 import { consumeOfficialLoaderRequest } from "@/lib/official/official-loader-intent"
+import { prefetchPublicNews } from "@/lib/official/fetch-public-news"
 import storiesJson from "@/data/official/stories.json"
 
 const REL_LOGIN_WINDOW_MS = 1000 * 60 * 60 * 24 * 30
@@ -74,17 +75,22 @@ async function runOfficialBootstrap(opts: {
   }
   onProgress(18)
 
-  let catalog: GasWorksCatalog = {}
-  try {
-    const res = await postGas<{ success?: boolean; catalog?: GasWorksCatalog }>({
-      action: "publicGetWorksCatalog",
-    })
-    if (res.success && res.catalog && typeof res.catalog === "object") {
-      catalog = res.catalog
+  const catalogPromise = (async (): Promise<GasWorksCatalog> => {
+    try {
+      const res = await postGas<{ success?: boolean; catalog?: GasWorksCatalog }>({
+        action: "publicGetWorksCatalog",
+      })
+      if (res.success && res.catalog && typeof res.catalog === "object") {
+        return res.catalog
+      }
+    } catch {
+      /* オフライン時は静的カタログのみ */
     }
-  } catch {
-    /* オフライン時は静的カタログのみ */
-  }
+    return {}
+  })()
+  const newsPromise = prefetchPublicNews().catch(() => [])
+
+  const catalog = await catalogPromise
   if (signal.cancelled) throw new Error("cancelled")
 
   const merged = mergeWorksCatalog(staticStories, catalog)
@@ -107,7 +113,7 @@ async function runOfficialBootstrap(opts: {
   }
   if (signal.cancelled) throw new Error("cancelled")
   onProgress(72)
-  await preloadPromise
+  await Promise.all([preloadPromise, newsPromise])
   if (signal.cancelled) throw new Error("cancelled")
   onProgress(92)
 

@@ -18,7 +18,7 @@ import {
   TypewriterHeading,
 } from "@/components/official-site/scroll-reveal"
 import { WORKS_CATALOG_PATH } from "@/lib/routes"
-import { formatNewsDate, getNewsItems, type NewsItem } from "@/lib/official/news"
+import { formatNewsDate, type NewsItem } from "@/lib/official/news"
 import { fetchPublishedNewsItems } from "@/lib/official/fetch-public-news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 import type { GasWorksCatalog, MergedWorkItem } from "@/lib/official/works-catalog"
@@ -231,7 +231,7 @@ function CasesSection({
 /* ── News ────────────────────────────────────────────────── */
 
 function NewsSection() {
-  const [items, setItems] = useState<NewsItem[]>(() => getNewsItems().slice(0, 3))
+  const [items, setItems] = useState<NewsItem[]>([])
 
   useEffect(() => {
     let cancelled = false

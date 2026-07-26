@@ -34,7 +34,7 @@ const fieldClass =
   "rounded-sm border-[#30363d] bg-[#0e1116] text-[#e6edf3] placeholder:text-[#8b949e] focus-visible:border-[#1f6feb] focus-visible:ring-[#1f6feb]/30"
 
 export default function AdminNewsPage() {
-  const [catalog, setCatalog] = useState<NewsCatalog>(getStaticNewsCatalog())
+  const [catalog, setCatalog] = useState<NewsCatalog>({ items: [] })
   const [selectedId, setSelectedId] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

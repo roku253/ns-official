@@ -1,13 +1,4 @@
 {
-  "description_ja": "公式サイトのお知らせのフォールバック。運営は /admin/news から GAS に保存（docs/gas-cms.md）。GAS 未設定時のみこの JSON が使われる。date の降順で表示。",
-  "items": [
-    {
-      "id": "2026-07-news-open",
-      "date": "2026-07-25",
-      "category": "お知らせ",
-      "title": "お知らせ欄の運用を開始しました",
-      "body": "公式サイトのお知らせ欄の運用を開始しました。新作の公開、アップデート、メンテナンスのご案内はこの欄に掲載します。",
-      "published": true
-    }
-  ]
+  "description_ja": "公式サイトお知らせのオフライン用フォールバック。正本は /admin/news → GAS（docs/gas-cms.md）。GAS 取得成功時は空でもこの JSON は使わない。",
+  "items": []
 }

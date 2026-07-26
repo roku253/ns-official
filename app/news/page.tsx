@@ -6,11 +6,11 @@ import { OfficialLoadingScreen } from "@/components/official-site/official-loadi
 import { OfficialSiteHeader } from "@/components/official-site/official-site-header"
 import { OfficialSitePortalFooter } from "@/components/official-site/official-site-portal-footer"
 import { fetchPublishedNewsItems } from "@/lib/official/fetch-public-news"
-import { formatNewsDate, getNewsItems, type NewsItem } from "@/lib/official/news"
+import { formatNewsDate, type NewsItem } from "@/lib/official/news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 
 function NewsMain() {
-  const [items, setItems] = useState<NewsItem[]>(() => getNewsItems())
+  const [items, setItems] = useState<NewsItem[]>([])
   const [loadingNews, setLoadingNews] = useState(true)
 
   useEffect(() => {

@@ -6,7 +6,7 @@
 |------|-------------------|
 | 公式 | https://nazo-portal.vercel.app （Vercel: `nazo-portal` ← GitHub `roku253/ns-official`） |
 | 作品 | https://koko-ni-iru.vercel.app （Vercel: `koko-ni-iru`） |
-| プレイ入口 | https://nazo-portal.vercel.app/play/koko-ni-iru → rewrite → 作品 |
+| プレイ | 公式コンソール／カタログの **プレイ先 URL** → 作品へ直接遷移（rewrite なし） |
 
 ## 公式の正本
 
@@ -35,36 +35,23 @@ npx vercel --prod --yes
 
 環境変数: `NEXT_PUBLIC_GAS_URL`, `GAS_WEBAPP_URL`, `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_OFFICIAL_ORIGIN`
 
-## rewrite
+## 作品の紐づけ
 
-[`vercel.json`](./vercel.json) は作品 Production を指す:
+公式はゲームをホストしません。`/admin/works` の **プレイ先 URL**（静的シードは `manifest.json` の `catalog.externalUrl`）で作品アプリへ飛ばします。
 
-```json
-{
-  "rewrites": [
-    {
-      "source": "/play/koko-ni-iru",
-      "destination": "https://koko-ni-iru.vercel.app/play/koko-ni-iru"
-    },
-    {
-      "source": "/play/koko-ni-iru/:path*",
-      "destination": "https://koko-ni-iru.vercel.app/play/koko-ni-iru/:path*"
-    }
-  ]
-}
-```
+例（ここにいる）: `https://koko-ni-iru.vercel.app/play/koko-ni-iru`
 
 ## API 経路
 
 | パス | 担当 |
 |------|------|
-| `/api/gas` | 公式（公式ページ用）。作品プレイ中は `/play/koko-ni-iru/api/gas`（作品側にも同 API あり） |
+| `/api/gas` | 公式（公式ページ用） |
 | `/api/platform/*` | 公式（token-gate / entitlement） |
-| `/play/koko-ni-iru/api/player/*` | 作品（rewrite 経由で到達） |
+| 作品側 `/api/*` | 作品アプリ（独自オリジン） |
 
 ## 確認チェック
 
-- [ ] 公式ログイン → works プレイ → `/play/koko-ni-iru`
+- [ ] 公式ログイン → works プレイ → 作品オリジンへ遷移
 - [ ] バーガー「続きから」
 - [ ] 家ボタンで公式トップへ
 - [ ] 班長チャット / token-gate
@@ -75,3 +62,5 @@ npx vercel --prod --yes
 cd "D:\謎解き\公式サイト" && npm run dev
 cd "D:\謎解き\作品\ここにいる" && npm run dev -- -p 3001
 ```
+
+ローカルでは `/admin/works` のプレイ先を `http://127.0.0.1:3001/play/koko-ni-iru` に一時変更して確認できます。

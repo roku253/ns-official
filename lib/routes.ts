@@ -1,5 +1,5 @@
-/** 調査任務（『ここにいる』）— 公式 rewrite 入口 */
-export const INVESTIGATION_PORTAL_PATH = "/play/koko-ni-iru"
+/** 『ここにいる』作品アプリのプレイ入口（公式とは別デプロイ） */
+export const INVESTIGATION_PORTAL_PATH = "https://koko-ni-iru.vercel.app/play/koko-ni-iru"
 
 /** 会員向けアカウント設定（公式サイト側） */
 export const ACCOUNT_SETTINGS_PATH = "/account"

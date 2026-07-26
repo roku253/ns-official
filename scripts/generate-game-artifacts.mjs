@@ -220,7 +220,7 @@ export const CASE_ID_TO_ENGINE_PACKAGE: Record<string, string> = {
 ${caseToEngineLines}
 }
 
-/** signal-trace 系案件（別作品デプロイへ rewrite する対象） */
+/** signal-trace 系案件（任務ポータル作品。プレイ先は catalog.externalUrl） */
 export const SIGNAL_TRACE_CASE_IDS = ${signalCaseIdsJson} as readonly string[]
 
 export function usesMissionPortal(caseId: string): boolean {
@@ -228,13 +228,11 @@ export function usesMissionPortal(caseId: string): boolean {
   return SIGNAL_TRACE_CASE_IDS.includes(id)
 }
 
-/** 作品選択後の第一遷移先。signal-trace は /play/<caseId>（公式 rewrite → 作品アプリ） */
+/** プレイ先未設定時のフォールバック（作品詳細）。本番プレイは externalUrl を使う */
 export function playEntryPathForCase(caseId: string): string {
   const id = (caseId || "").trim()
   if (!id) return "/"
-  if (usesMissionPortal(id)) return "/play/" + encodeURIComponent(id)
-  const engine = CASE_ID_TO_ENGINE_PACKAGE[id]
-  return engine ? "/play/" + encodeURIComponent(engine) : "/"
+  return "/works/" + encodeURIComponent(id)
 }
 `
   writeIfChanged(path.join(root, "data", "official", "stories.json"), JSON.stringify(stories, null, 2) + "\n")

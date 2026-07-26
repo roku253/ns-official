@@ -5,6 +5,7 @@ import { postGas } from "@/lib/gas"
 import { LS_ACCOUNT, LS_AUTH, LS_SESSION } from "@/lib/storage-keys"
 import type { GasWorksCatalog, MergedWorkItem, WorkStoryRecord } from "@/lib/official/works-catalog"
 import { mergeWorksCatalog } from "@/lib/official/works-catalog"
+import { rememberWorkPlayUrls } from "@/lib/official/work-play-urls"
 import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
 import { consumeOfficialLoaderRequest } from "@/lib/official/official-loader-intent"
 import { prefetchPublicNews } from "@/lib/official/fetch-public-news"
@@ -58,6 +59,7 @@ async function runOfficialBootstrap(opts: {
 }): Promise<CachedBootstrap> {
   const { onProgress, signal, withMinDelay } = opts
   const staticStories = storiesJson as unknown as WorkStoryRecord[]
+  rememberWorkPlayUrls(staticStories)
   const startedAt = Date.now()
   onProgress(5)
 
@@ -94,6 +96,7 @@ async function runOfficialBootstrap(opts: {
   if (signal.cancelled) throw new Error("cancelled")
 
   const merged = mergeWorksCatalog(staticStories, catalog)
+  rememberWorkPlayUrls(merged)
   onProgress(42)
 
   const preloadPromise = preloadOfficialPlaceholders()

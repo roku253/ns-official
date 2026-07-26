@@ -23,7 +23,7 @@ const nextConfig = {
       },
       {
         source: "/portal",
-        destination: "/play/koko-ni-iru",
+        destination: "https://koko-ni-iru.vercel.app/play/koko-ni-iru",
         permanent: false,
       },
     ]

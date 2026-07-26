@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { setActiveWorkAndOpenPortal } from "@/lib/official/play-work-navigation"
+import { resolveWorkPlayUrl } from "@/lib/official/work-play-urls"
 import { navigateWithOfficialLeaveLoader } from "@/lib/official/show-official-leave-loader"
 import { LS_ACCOUNT, LS_SESSION } from "@/lib/storage-keys"
 import { cn } from "@/lib/utils"
@@ -94,7 +95,7 @@ export function PlayThisWorkButton({
         className
       )}
       onClick={async () => {
-        const ext = (externalUrl || "").trim()
+        const ext = resolveWorkPlayUrl(workId, externalUrl)
         const resKey = (tokenResource || "").trim()
         if (ext && resKey) {
           const r = await openExternalWithToken(workId, ext, resKey)
@@ -103,12 +104,7 @@ export function PlayThisWorkButton({
           }
           return
         }
-        if (ext) {
-          window.localStorage.setItem(LS_ACCOUNT.CASE_ID, workId)
-          navigateWithOfficialLeaveLoader(ext)
-          return
-        }
-        setActiveWorkAndOpenPortal(workId)
+        setActiveWorkAndOpenPortal(workId, ext)
       }}
     >
       {children ?? "この作品をプレイ"}
@@ -139,19 +135,14 @@ export function PlayThisWorkTextLink({
       type="button"
       className={cn("text-left text-sm font-medium text-primary hover:underline", className)}
       onClick={async () => {
-        const ext = (externalUrl || "").trim()
+        const ext = resolveWorkPlayUrl(workId, externalUrl)
         const resKey = (tokenResource || "").trim()
         if (ext && resKey) {
           const r = await openExternalWithToken(workId, ext, resKey)
           if (!r.ok) window.alert(r.message || "エラー")
           return
         }
-        if (ext) {
-          window.localStorage.setItem(LS_ACCOUNT.CASE_ID, workId)
-          navigateWithOfficialLeaveLoader(ext)
-          return
-        }
-        setActiveWorkAndOpenPortal(workId)
+        setActiveWorkAndOpenPortal(workId, ext)
       }}
     >
       {children ?? "この作品をプレイ →"}

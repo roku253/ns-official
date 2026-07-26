@@ -18,11 +18,8 @@ import {
   TypewriterHeading,
 } from "@/components/official-site/scroll-reveal"
 import { WORKS_CATALOG_PATH } from "@/lib/routes"
-import { formatNewsDate, type NewsItem } from "@/lib/official/news"
-import {
-  fetchPublishedNewsItems,
-  getCachedPublishedNewsItems,
-} from "@/lib/official/fetch-public-news"
+import { formatNewsDate } from "@/lib/official/news"
+import { usePublishedNews } from "@/lib/official/use-published-news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 import type { GasWorksCatalog, MergedWorkItem } from "@/lib/official/works-catalog"
 import {
@@ -234,18 +231,7 @@ function CasesSection({
 /* ── News ────────────────────────────────────────────────── */
 
 function NewsSection() {
-  const [items, setItems] = useState<NewsItem[]>(() => getCachedPublishedNewsItems().slice(0, 3))
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const next = await fetchPublishedNewsItems({ force: true })
-      if (!cancelled) setItems(next.slice(0, 3))
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const items = usePublishedNews(3)
 
   return (
     <section id="news" className="relative w-full bg-[#0a0c10] py-24 text-center md:py-32">

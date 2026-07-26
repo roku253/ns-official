@@ -1,30 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
 import { OfficialLoadingScreen } from "@/components/official-site/official-loading-screen"
 import { OfficialSiteHeader } from "@/components/official-site/official-site-header"
 import { OfficialSitePortalFooter } from "@/components/official-site/official-site-portal-footer"
-import {
-  fetchPublishedNewsItems,
-  getCachedPublishedNewsItems,
-} from "@/lib/official/fetch-public-news"
-import { formatNewsDate, type NewsItem } from "@/lib/official/news"
+import { formatNewsDate } from "@/lib/official/news"
+import { usePublishedNews } from "@/lib/official/use-published-news"
 import { useOfficialBootstrap } from "@/lib/official/use-official-bootstrap"
 
 function NewsMain() {
-  const [items, setItems] = useState<NewsItem[]>(() => getCachedPublishedNewsItems())
-
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const next = await fetchPublishedNewsItems({ force: true })
-      if (!cancelled) setItems(next)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const items = usePublishedNews()
 
   return (
     <>

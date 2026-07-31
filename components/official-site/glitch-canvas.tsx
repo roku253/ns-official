@@ -36,6 +36,8 @@ type Props = {
   className?: string
   /** 外部イベント名で強い flash を発火する（既定 "glitch-burst"） */
   burstEventName?: string
+  /** false のとき描画ループを止める（閉じたメニュー用） */
+  active?: boolean
 }
 
 const PROFILES: Record<
@@ -60,13 +62,13 @@ const PROFILES: Record<
     rgbSplitMax: 4,
   },
   panel: {
-    dustPerFrame: 60,
-    dustAlpha: 0.16,
+    dustPerFrame: 28,
+    dustAlpha: 0.12,
     gridStep: 48,
-    gridAlpha: 0.05,
-    scanlineChance: 0.04,
-    glitchBurstChance: 0.012,
-    rgbSplitMax: 7,
+    gridAlpha: 0.04,
+    scanlineChance: 0.02,
+    glitchBurstChance: 0.006,
+    rgbSplitMax: 5,
   },
   burst: {
     dustPerFrame: 200,
@@ -84,6 +86,7 @@ export function GlitchCanvas({
   hue = { r: 232, g: 216, b: 154 }, // ゴールド系（既存サイトの #e8d89a 寄り）
   className,
   burstEventName = "glitch-burst",
+  active = true,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   /** 外部イベントで一時的に強度を引き上げるための残り時間（秒） */
@@ -94,6 +97,11 @@ export function GlitchCanvas({
     if (!canvas) return
     const ctx = canvas.getContext("2d", { alpha: true })
     if (!ctx) return
+
+    if (!active) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      return
+    }
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     const profile = PROFILES[intensity]
@@ -245,7 +253,7 @@ export function GlitchCanvas({
       window.removeEventListener(burstEventName, onBurst as EventListener)
       document.removeEventListener("visibilitychange", onVis)
     }
-  }, [intensity, hue, burstEventName])
+  }, [intensity, hue, burstEventName, active])
 
   return (
     <canvas

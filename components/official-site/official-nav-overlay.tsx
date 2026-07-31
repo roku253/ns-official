@@ -72,6 +72,9 @@ export function OfficialNavOverlay({
 }: OfficialNavOverlayProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  /** 閉じアニメ中もパネルを描画するため、完全に閉じるまで true */
+  const [menuLive, setMenuLive] = useState(false)
+  const [everOpened, setEverOpened] = useState(false)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const overlayId = useId()
@@ -143,7 +146,7 @@ export function OfficialNavOverlay({
     if (q(".js-nav-bg").length) {
       tl.to(
         q(".js-nav-bg"),
-        { opacity: 1, duration: reduce ? 0 : 0.4, ease: "power2.out" },
+        { opacity: 1, duration: reduce ? 0 : 0.22, ease: "power2.out" },
         0
       )
     }
@@ -151,7 +154,7 @@ export function OfficialNavOverlay({
       tl.fromTo(
         q(".js-nav-top"),
         { x: "-101%", y: 0, rotation: 0 },
-        { x: "0%", y: 0, duration: reduce ? 0 : 0.6, ease: "back.out(1.2)" },
+        { x: "0%", y: 0, duration: reduce ? 0 : 0.38, ease: "power3.out" },
         0
       )
     }
@@ -159,36 +162,36 @@ export function OfficialNavOverlay({
       tl.fromTo(
         q(".js-nav-bottom"),
         { x: "101%", y: 0, rotation: 0 },
-        { x: "0%", y: 0, duration: reduce ? 0 : 0.6, ease: "back.out(1.2)" },
-        0.05
+        { x: "0%", y: 0, duration: reduce ? 0 : 0.38, ease: "power3.out" },
+        0.04
       )
     }
     if (q(".js-nav-item").length) {
       tl.fromTo(
         q(".js-nav-item"),
-        { opacity: 0, x: -20 },
+        { opacity: 0, x: -16 },
         {
           opacity: 1,
           x: 0,
-          duration: reduce ? 0 : 1.0,
-          ease: "expo.out",
-          stagger: reduce ? 0 : 0.04,
+          duration: reduce ? 0 : 0.36,
+          ease: "power3.out",
+          stagger: reduce ? 0 : 0.03,
         },
-        0.12
+        0.08
       )
     }
     if (q(".js-nav-bottom-row").length) {
       tl.fromTo(
         q(".js-nav-bottom-row"),
-        { opacity: 0, y: 12 },
+        { opacity: 0, y: 10 },
         {
           opacity: 1,
           y: 0,
-          duration: reduce ? 0 : 0.45,
+          duration: reduce ? 0 : 0.28,
           ease: "power3.out",
-          stagger: reduce ? 0 : 0.05,
+          stagger: reduce ? 0 : 0.04,
         },
-        0.3
+        0.12
       )
     }
     /* SVG ハンバーガー → X（要素はボタン内側にあるので bq を使う） */
@@ -197,10 +200,10 @@ export function OfficialNavOverlay({
         bq(".js-bar-top"),
         {
           attr: { x1: 5, y1: 5, x2: 15, y2: 15 },
-          duration: reduce ? 0 : 0.32,
-          ease: "back.out(1.4)",
+          duration: reduce ? 0 : 0.22,
+          ease: "power2.out",
         },
-        0.06
+        0.04
       )
     }
     if (bq(".js-bar-bot").length) {
@@ -208,16 +211,16 @@ export function OfficialNavOverlay({
         bq(".js-bar-bot"),
         {
           attr: { x1: 15, y1: 5, x2: 5, y2: 15 },
-          duration: reduce ? 0 : 0.32,
-          ease: "back.out(1.4)",
+          duration: reduce ? 0 : 0.22,
+          ease: "power2.out",
         },
-        0.06
+        0.04
       )
     }
     if (bq(".js-bar-mid").length) {
       tl.to(
         bq(".js-bar-mid"),
-        { opacity: 0, duration: reduce ? 0 : 0.18, ease: "power2.out" },
+        { opacity: 0, duration: reduce ? 0 : 0.12, ease: "power2.out" },
         0
       )
     }
@@ -229,7 +232,7 @@ export function OfficialNavOverlay({
     if (bq(".js-bar-top").length) {
       tl.to(bq(".js-bar-top"), {
         attr: { x1: 3, y1: 7, x2: 17, y2: 7 },
-        duration: reduce ? 0 : 0.22,
+        duration: reduce ? 0 : 0.18,
         ease: "power3.in",
       })
     }
@@ -238,7 +241,7 @@ export function OfficialNavOverlay({
         bq(".js-bar-bot"),
         {
           attr: { x1: 3, y1: 13, x2: 17, y2: 13 },
-          duration: reduce ? 0 : 0.22,
+          duration: reduce ? 0 : 0.18,
           ease: "power3.in",
         },
         "<"
@@ -247,7 +250,7 @@ export function OfficialNavOverlay({
     if (bq(".js-bar-mid").length) {
       tl.to(
         bq(".js-bar-mid"),
-        { opacity: 1, duration: reduce ? 0 : 0.18, ease: "power2.out" },
+        { opacity: 1, duration: reduce ? 0 : 0.14, ease: "power2.out" },
         "<"
       )
     }
@@ -257,10 +260,10 @@ export function OfficialNavOverlay({
         q(".js-nav-panel"),
         {
           y: "110vh",
-          rotation: () => gsap.utils.random(-22, 22),
-          duration: reduce ? 0 : 0.85,
+          rotation: () => gsap.utils.random(-12, 12),
+          duration: reduce ? 0 : 0.48,
           ease: "power3.in",
-          stagger: reduce ? 0 : { from: "end", each: 0.04 },
+          stagger: reduce ? 0 : { from: "end", each: 0.03 },
         },
         "<"
       )
@@ -268,24 +271,28 @@ export function OfficialNavOverlay({
     if (q(".js-nav-bg").length) {
       tl.to(
         q(".js-nav-bg"),
-        { opacity: 0, duration: reduce ? 0 : 0.32, ease: "power2.in" },
-        "<0.15"
+        { opacity: 0, duration: reduce ? 0 : 0.22, ease: "power2.in" },
+        "<0.08"
       )
     }
     tl.set(root, { autoAlpha: 0, visibility: "hidden", pointerEvents: "none" })
+    tl.call(() => {
+      setMenuLive(false)
+    })
 
     tlRef.current = tl
 
     return () => {
       tl.kill()
     }
-  }, [mounted])
+  }, [mounted, everOpened])
 
   /* open フラグの変化に応じて GSAP timeline を制御 */
   useEffect(() => {
     const tl = tlRef.current
     if (!tl) return
     if (open) {
+      tl.eventCallback("onReverseComplete", null)
       if (tl.time() >= enterEndRef.current) {
         /** すでに EXIT が終わって最後に居る → restart で 0 から ENTER */
         tl.timeScale(1).restart()
@@ -295,13 +302,20 @@ export function OfficialNavOverlay({
     } else {
       if (tl.time() < enterEndRef.current) {
         /** ENTER 途中 → 反転して閉じる（速め） */
-        tl.timeScale(1.6).reverse()
-      } else {
+        tl.eventCallback("onReverseComplete", () => {
+          setMenuLive(false)
+          tl.eventCallback("onReverseComplete", null)
+        })
+        tl.timeScale(1.8).reverse()
+      } else if (tl.time() > enterEndRef.current) {
         /** ENTER は完了している → 続きの EXIT を再生 */
+        tl.timeScale(1).play()
+      } else {
+        /** pause 地点（フルオープン）→ EXIT へ */
         tl.timeScale(1).play()
       }
     }
-  }, [open])
+  }, [open, everOpened])
 
   /* 各種ハンドラ */
   useEffect(() => {
@@ -353,7 +367,11 @@ export function OfficialNavOverlay({
         aria-expanded={open}
         aria-controls={overlayId}
         aria-label={open ? "メニューを閉じる" : "メニューを開く"}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setEverOpened(true)
+          setMenuLive(true)
+          setOpen((v) => !v)
+        }}
         className={cn(
           "group relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-sm border border-[#c9a227]/40 bg-black/35 text-[#e8d89a] transition-colors hover:border-[#c9a227] hover:bg-[#c9a227]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c9a227]/55",
           className
@@ -401,7 +419,7 @@ export function OfficialNavOverlay({
         </svg>
       </button>
 
-      {mounted
+      {mounted && everOpened
         ? createPortal(
             <div
               id={overlayId}
@@ -419,12 +437,12 @@ export function OfficialNavOverlay({
                 tabIndex={-1}
                 aria-hidden
                 onClick={() => setOpen(false)}
-                className="js-nav-bg absolute inset-0 cursor-default bg-[#050607]/82 backdrop-blur-sm"
+                className="js-nav-bg absolute inset-0 cursor-default bg-[#050607]/82"
               />
 
-              {/* 共通グリッチ・粒子 */}
+              {/* 共通グリッチ・粒子（開いているときだけ描画） */}
               <div aria-hidden className="pointer-events-none absolute inset-0 z-[1]">
-                <GlitchCanvas intensity="ambient" />
+                <GlitchCanvas intensity="ambient" active={menuLive} />
               </div>
 
               {/* GlitchTitle 用のキーフレームを 1 度だけ注入 */}
@@ -442,10 +460,10 @@ export function OfficialNavOverlay({
                 {/* ── Block 1 (TOP) : Home / Works / News / About / Contact ── */}
                 <section
                   aria-label="メインナビゲーション"
-                  className="js-nav-panel js-nav-top relative flex w-full shrink-0 flex-col overflow-hidden border border-[#c9a227]/35 bg-[#0a0c10]/85 p-7 backdrop-blur-md md:p-10"
+                  className="js-nav-panel js-nav-top relative flex w-full shrink-0 flex-col overflow-hidden border border-[#c9a227]/35 bg-[#0a0c10]/92 p-7 md:p-10"
                 >
                   {/* パネル内部背景：粒子 + RGB スプリット帯 */}
-                  <GlitchCanvas intensity="panel" className="opacity-90" />
+                  <GlitchCanvas intensity="panel" className="opacity-90" active={menuLive} />
 
                   {/* HUD 風の角マーク */}
                   <CornerHud />
@@ -485,9 +503,9 @@ export function OfficialNavOverlay({
                 {/* ── Block 2 (BOTTOM) : 作品検索 + ログイン ── */}
                 <section
                   aria-label="検索とアカウント"
-                  className="js-nav-panel js-nav-bottom relative flex w-full shrink-0 flex-col overflow-hidden border border-[#7f9cb8]/35 bg-[#080a0e]/90 p-6 backdrop-blur-md md:flex-row md:items-stretch md:gap-8 md:p-8"
+                  className="js-nav-panel js-nav-bottom relative flex w-full shrink-0 flex-col overflow-hidden border border-[#7f9cb8]/35 bg-[#080a0e]/94 p-6 md:flex-row md:items-stretch md:gap-8 md:p-8"
                 >
-                  <GlitchCanvas intensity="panel" hue={{ r: 127, g: 156, b: 184 }} />
+                  <GlitchCanvas intensity="panel" hue={{ r: 127, g: 156, b: 184 }} active={menuLive} />
                   <CornerHud color="#7f9cb8" />
 
                   <div className="js-nav-bottom-row relative z-[2] flex flex-1 flex-col gap-3">

@@ -479,12 +479,12 @@ export default function AdminWorksCmsPage() {
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-[11px] text-[#8b949e]">
-                    プレイ先 URL（作品アプリの本番 URL。空なら作品詳細へ）
+                    プレイ先 URL（ここにいるは /play/koko-ni-iru。別オリジン直リンクはログインが切れます）
                   </Label>
                   <Input
                     value={draft.externalUrl || ""}
                     onChange={(e) => patchSelectedStory({ externalUrl: e.target.value.trim() })}
-                    placeholder="https://koko-ni-iru.vercel.app/play/koko-ni-iru"
+                    placeholder="/play/koko-ni-iru または https://…"
                     className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>

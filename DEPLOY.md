@@ -6,25 +6,20 @@
 |------|-------------------|
 | 公式 | https://nazo-portal.vercel.app （Vercel: `nazo-portal` ← GitHub `roku253/ns-official`） |
 | 作品 | https://koko-ni-iru.vercel.app （Vercel: `koko-ni-iru`） |
-| プレイ | 公式コンソール／カタログの **プレイ先 URL** → 作品へ直接遷移（rewrite なし） |
+| プレイ | https://nazo-portal.vercel.app/play/koko-ni-iru → rewrite → 作品（**同一オリジン**でログイン維持） |
 
 ## 公式の正本
 
 - ローカル: `D:\謎解き\公式サイト`
 - GitHub: https://github.com/roku253/ns-official
 - Vercel Root Directory: リポ直下（空 / `.`）
-- **`メイン画面/main-portal-next` への同期は不要**
 
 ```bash
 cd "D:\謎解き\公式サイト"
-# 変更を push すれば Production が自動デプロイ
 git add -A && git commit -m "..." && git push
-
-# または CLI
-npx vercel --prod
 ```
 
-環境変数: `GAS_*`, `ADMIN_PORTAL_KEY`, 画像UP用 `BLOB_READ_WRITE_TOKEN`（Claude は公式には不要）
+環境変数: `GAS_*`, `ADMIN_PORTAL_KEY`, 画像UP用 `BLOB_READ_WRITE_TOKEN`
 
 ## 作品アプリ
 
@@ -37,24 +32,36 @@ npx vercel --prod --yes
 
 ## 作品の紐づけ
 
-公式はゲームをホストしません。`/admin/works` の **プレイ先 URL**（静的シードは `manifest.json` の `catalog.externalUrl`）で作品アプリへ飛ばします。
+コンソールの **プレイ先 URL** は次のどちらか:
 
-例（ここにいる）: `https://koko-ni-iru.vercel.app/play/koko-ni-iru`
+1. **同一オリジン経路（推奨・ここにいる）**: `/play/koko-ni-iru`  
+   → [`vercel.json`](./vercel.json) の rewrite で作品へ転送。ログイン情報が残る。
+2. **別オリジンの絶対 URL**: 別デプロイ作品向け。ログイン共有は別途必要。
 
-## API 経路
+`https://koko-ni-iru.vercel.app/...` を直書きすると別オリジンになり、任務ポータルが未ログイン扱いで公式へ戻します。公式側はこれを `/play/koko-ni-iru` に正規化します。
 
-| パス | 担当 |
-|------|------|
-| `/api/gas` | 公式（公式ページ用） |
-| `/api/platform/*` | 公式（token-gate / entitlement） |
-| 作品側 `/api/*` | 作品アプリ（独自オリジン） |
+## rewrite
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/play/koko-ni-iru",
+      "destination": "https://koko-ni-iru.vercel.app/play/koko-ni-iru"
+    },
+    {
+      "source": "/play/koko-ni-iru/:path*",
+      "destination": "https://koko-ni-iru.vercel.app/play/koko-ni-iru/:path*"
+    }
+  ]
+}
+```
 
 ## 確認チェック
 
-- [ ] 公式ログイン → works プレイ → 作品オリジンへ遷移
+- [ ] 公式ログイン → プレイ → 任務ポータル（公式ドメインのまま）
 - [ ] バーガー「続きから」
 - [ ] 家ボタンで公式トップへ
-- [ ] 班長チャット / token-gate
 
 ## ローカル同時起動
 
@@ -63,4 +70,4 @@ cd "D:\謎解き\公式サイト" && npm run dev
 cd "D:\謎解き\作品\ここにいる" && npm run dev -- -p 3001
 ```
 
-ローカルでは `/admin/works` のプレイ先を `http://127.0.0.1:3001/play/koko-ni-iru` に一時変更して確認できます。
+ローカルでは rewrite が効かないので、プレイ先を `http://127.0.0.1:3001/play/koko-ni-iru` にするか、本番相当の proxy を別途用意してください。

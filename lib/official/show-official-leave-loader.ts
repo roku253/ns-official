@@ -14,7 +14,7 @@ const HOST_ID = "ns-official-leave-loader"
 export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作品を起動しています…") {
   if (typeof window === "undefined") return
 
-  requestOfficialLoader("return-from-play")
+  requestOfficialLoader("enter-play")
 
   let host = document.getElementById(HOST_ID)
   if (!host) {

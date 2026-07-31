@@ -1,2 +1,12 @@
 {
+  "rewrites": [
+    {
+      "source": "/play/koko-ni-iru",
+      "destination": "https://koko-ni-iru.vercel.app/play/koko-ni-iru"
+    },
+    {
+      "source": "/play/koko-ni-iru/:path*",
+      "destination": "https://koko-ni-iru.vercel.app/play/koko-ni-iru/:path*"
+    }
+  ]
 }

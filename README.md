@@ -7,7 +7,7 @@
 - トップ / 作品一覧・詳細 / お知らせ / ログイン・登録
 - 管理画面（`/admin`）
 - GAS 中継（`/api/gas`）・プラットフォーム entitlement API
-- 作品への入口: カタログのプレイ先 URL（例: `https://koko-ni-iru.vercel.app/play/koko-ni-iru`）
+- 作品への入口: `/play/koko-ni-iru`（Vercel rewrite → 作品。同一オリジンでログイン維持）
 
 ## 含めないもの
 
@@ -29,7 +29,7 @@ npm run dev                  # http://localhost:3000
 
 - GitHub: https://github.com/roku253/ns-official
 - Vercel: `nazo-portal`（https://nazo-portal.vercel.app）— Root はリポ直下
-- rewrite なし。プレイ先は `/admin/works` の URL（シード: manifest `externalUrl`）
+- プレイ先: `/admin/works` の URL。ここにいるは `/play/koko-ni-iru`（rewrite）
 - Apps Script 正本: この配下の `apps-script/`
 
 ## 旧モノリス

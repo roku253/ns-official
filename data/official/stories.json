@@ -12,7 +12,7 @@
     "featured": true,
     "sortOrder": 0,
     "accent": "from-[#070b14] via-cyan-950/95 to-emerald-950/85",
-    "externalUrl": "https://koko-ni-iru.vercel.app/play/koko-ni-iru",
+    "externalUrl": "/play/koko-ni-iru",
     "detail": {
       "estimatedPlayMinutesMin": 60,
       "estimatedPlayMinutesMax": 120,

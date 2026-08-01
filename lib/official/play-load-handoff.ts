@@ -1,6 +1,7 @@
 /** 公式→作品のローダー進捗引き継ぎ（同一オリジン sessionStorage） */
 
 export const SS_PLAY_LOAD_HANDOFF = "ns_play_load_handoff"
+export const PLAY_BOOT_BRIDGE_ID = "ns-play-boot-bridge"
 
 export type PlayLoadHandoff = {
   progress: number
@@ -41,7 +42,6 @@ export function writePlayLoadHandoff(progress: number, statusLine?: string) {
   }
 }
 
-/** 消費せず読む（初回描画のチラつき防止） */
 export function peekPlayLoadHandoff(): PlayLoadHandoff | null {
   if (typeof window === "undefined") return null
   try {

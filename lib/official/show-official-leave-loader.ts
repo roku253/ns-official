@@ -7,10 +7,10 @@ import { writePlayLoadHandoff } from "@/lib/official/play-load-handoff"
 
 const HOST_ID = "ns-official-leave-loader"
 
-function resolvePrefetchUrl(url: string): string {
+/** /play/<id> → /play/<id>/portal（リダイレクト二重遷移を避ける） */
+function resolvePortalUrl(url: string): string {
   try {
     const u = new URL(url, window.location.origin)
-    // /play/<id> は /portal へリダイレクトされるので先にポータルを温める
     const m = u.pathname.match(/^(\/play\/[^/]+)\/?$/)
     if (m) {
       u.pathname = `${m[1]}/portal`
@@ -40,7 +40,7 @@ async function prefetchDestination(
     res = await fetch(url, {
       method: "GET",
       credentials: "same-origin",
-      cache: "no-store",
+      cache: "force-cache",
       headers: { Accept: "text/html,*/*" },
     })
   } catch {
@@ -85,7 +85,7 @@ async function prefetchDestination(
 
 /**
  * 作品起動前に CRT ローダーを重ね、遷移先を実プリフェッチしてからハード遷移する。
- * 進捗は sessionStorage handoff で作品側ローダーへ継続（二重ブート防止）。
+ * 進捗は sessionStorage handoff で作品側ブリッジへ継続（二重ブート・ちらつき防止）。
  */
 export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作品を起動しています…") {
   if (typeof window === "undefined") return
@@ -94,7 +94,7 @@ export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作�
   if (!host) {
     host = document.createElement("div")
     host.id = HOST_ID
-    host.style.cssText = "position:fixed;inset:0;z-index:2147483647"
+    host.style.cssText = "position:fixed;inset:0;z-index:2147483647;background:#020303"
     document.body.appendChild(host)
   }
 
@@ -115,11 +115,11 @@ export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作�
 
   paint(4)
 
-  const target = absoluteUrl(url)
-  const prefetchTarget = resolvePrefetchUrl(url)
+  // リダイレクトを挟まずポータルへ直接遷移
+  const target = resolvePortalUrl(absoluteUrl(url))
 
   void (async () => {
-    await prefetchDestination(prefetchTarget, (n) => paint(n, statusLine))
+    await prefetchDestination(target, (n) => paint(n, statusLine))
     paint(Math.max(progress, 55), statusLine)
     writePlayLoadHandoff(progress, statusLine)
     if (navigated) return

@@ -2,10 +2,12 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin-session-constants"
 import { adminSessionTokenEdge, timingSafeEqualUtf8 } from "@/lib/admin-session-edge"
+import { getPlayBindingMap, mapPlayPathToUpstream } from "@/lib/official/play-bindings"
 
 /**
  * Next.js 16+: 旧 middleware は proxy に統合（両方あるとビルドエラー）。
  *
+ * - `/play/*` … コンソール設定の upstreamOrigin へ同一オリジン rewrite（ログイン維持）
  * - `/games/*` … `public/games` 直叩きを抑止（同一 host の Referer のみ許可）。`/_template/` は緩和。
  * - `/admin/*` … 管理セッション（Cookie）検証。
  */
@@ -21,6 +23,15 @@ async function verifyAdminSessionEdge(req: NextRequest): Promise<boolean> {
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
+
+  if (pathname.startsWith("/play/") || pathname === "/play") {
+    const bindings = await getPlayBindingMap()
+    const target = mapPlayPathToUpstream(pathname, req.nextUrl.search, bindings)
+    if (target) {
+      return NextResponse.rewrite(new URL(target))
+    }
+    return NextResponse.next()
+  }
 
   if (pathname.startsWith("/games/")) {
     if (!pathname.includes("/_template/")) {
@@ -56,5 +67,5 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/games/:path*", "/admin", "/admin/:path*"],
+  matcher: ["/play", "/play/:path*", "/games/:path*", "/admin", "/admin/:path*"],
 }

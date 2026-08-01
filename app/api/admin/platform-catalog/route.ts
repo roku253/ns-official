@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: `GAS 接続エラー: ${msg}` }, { status: 502 })
   }
   const text = await upstream.text()
+  try {
+    const { invalidatePlayBindingCache } = await import("@/lib/official/play-bindings")
+    invalidatePlayBindingCache()
+  } catch {
+    /* ignore */
+  }
   return new NextResponse(text, {
     status: upstream.status,
     headers: { "Content-Type": "application/json; charset=utf-8" },

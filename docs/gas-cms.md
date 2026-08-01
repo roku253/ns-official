@@ -36,9 +36,9 @@
 - 公開オンオフ・トップおすすめ
 - タイトル / 詳細
 - カバー・スクショ（**ドラッグ＆ドロップ** → Vercel Blob、または URL）
-- **プレイ先 URL**（ここにいるは `/play/koko-ni-iru`＝公式 rewrite。作品ドメイン直書きはログイン切れ）
+- **同一ログインでプレイ**: 作品デプロイ origin（例 `https://….vercel.app`）を入れると、公式 `/play/<id>` 経由で転送（別オリジン直リンクはログイン切れ）
 
-ゲーム本体の ZIP アップロードはしません。作品アプリは別デプロイし、公式には「一覧メタ + プレイ先」だけ載せます。
+ゲーム本体の ZIP アップロードはしません。作品アプリは別デプロイし、公式には「一覧メタ + プレイ紐づけ」だけ載せます。
 
 画像UPには環境変数 `BLOB_READ_WRITE_TOKEN`（Vercel Storage → Blob）が必要です。
 
@@ -47,8 +47,10 @@
 `works.<engine>.stories.<caseId>` およびレガシー `overrides.<caseId>`:
 
 - `title` / `tagline` / `subtitle` / `status` / `coverImage`
-- `externalUrl` / `tokenResource` / `gameKind` / `sortOrder` / `theme` / `enginePackage`
+- `upstreamOrigin`（作品デプロイ origin） / `externalUrl`（通常は `/play/<id>` 自動） / `tokenResource` / `gameKind` / `sortOrder` / `theme` / `enginePackage`
 - `detail`: `{ estimatedPlayMinutesMin, estimatedPlayMinutesMax, genres[], longDescription[], screenshots[{src,alt}] }`
+
+保存時にトップレベル `playBindings`（`{ "<id>": { "upstreamOrigin": "…" } }`）も再構築します。公式 `proxy.ts` が `/play/*` 転送に使います。
 
 コンソール追加作品のフル定義は `cmsStories.<caseId>` にも保持します（静的 `stories.json` に無い ID）。
 

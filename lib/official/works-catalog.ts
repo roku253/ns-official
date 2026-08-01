@@ -30,8 +30,13 @@ export interface WorkStoryRecord {
   accent?: string
   /** 同じエンジン（ゲームパッケージ）配下にある別 case の関連付けに使う */
   enginePackage?: string
-  /** 公式「プレイ」で外部 URL を開くときのベース URL（トークンは別途付与） */
+  /** 公式「プレイ」で開くパス（同一オリジン推奨: `/play/<id>`） */
   externalUrl?: string
+  /**
+   * 作品アプリのデプロイ origin（例: https://koko-ni-iru.vercel.app）。
+   * 設定時、公式 `/play/<id>` がこの origin へ転送され、ログインを同一オリジンで維持する。
+   */
+  upstreamOrigin?: string
   /** issueAccessToken の resource_key と対応 */
   tokenResource?: string
   /** 詳細ページ用の追加情報（任意） */
@@ -71,6 +76,8 @@ export type GasStoryEntry = {
   detail?: WorkDetailRecord
   /** プレイ遷移先（絶対URLまたは /play/...）。未設定時は既定ルーティング */
   externalUrl?: string
+  /** 作品デプロイ origin。公式 `/play/<id>` の転送先 */
+  upstreamOrigin?: string
   tokenResource?: string
   gameKind?: string
   sortOrder?: number
@@ -101,6 +108,7 @@ export type GasWorksCatalog = {
       coverImage?: string
       detail?: WorkDetailRecord
       externalUrl?: string
+      upstreamOrigin?: string
       tokenResource?: string
       gameKind?: string
       sortOrder?: number
@@ -113,6 +121,11 @@ export type GasWorksCatalog = {
    * 公開一覧は静的 + こことマージする。
    */
   cmsStories?: Record<string, WorkStoryRecord> | null
+  /**
+   * `/play/<slug>` → 作品デプロイ origin のルックアップ（proxy 用）。
+   * 保存時に stories の upstreamOrigin から再構築する。
+   */
+  playBindings?: Record<string, string | { upstreamOrigin: string }> | null
 }
 
 export type MergedWorkItem = WorkStoryRecord & {
@@ -143,6 +156,7 @@ function displayOverridesForStory(
   coverImage?: string
   detail?: WorkDetailRecord
   externalUrl?: string
+  upstreamOrigin?: string
   tokenResource?: string
   gameKind?: string
   sortOrder?: number
@@ -160,6 +174,7 @@ function displayOverridesForStory(
     coverImage: nest?.coverImage,
     detail: nest?.detail,
     externalUrl: nest?.externalUrl,
+    upstreamOrigin: nest?.upstreamOrigin,
     tokenResource: nest?.tokenResource,
     gameKind: nest?.gameKind,
     sortOrder: nest?.sortOrder,
@@ -174,6 +189,7 @@ function displayOverridesForStory(
       status: fromNest.status ?? top.status,
       coverImage: fromNest.coverImage ?? top.coverImage,
       externalUrl: fromNest.externalUrl ?? top.externalUrl,
+      upstreamOrigin: fromNest.upstreamOrigin ?? top.upstreamOrigin,
       tokenResource: fromNest.tokenResource ?? top.tokenResource,
       gameKind: fromNest.gameKind ?? top.gameKind,
       theme: fromNest.theme ?? top.theme,
@@ -186,6 +202,7 @@ function displayOverridesForStory(
     status?: string
     coverImage?: string
     externalUrl?: string
+    upstreamOrigin?: string
     tokenResource?: string
     gameKind?: string
     theme?: string
@@ -251,6 +268,7 @@ function applyStoryOverridesToRecord(
     coverImage: o.coverImage ?? s.coverImage,
     detail: o.detail ?? s.detail,
     externalUrl: o.externalUrl ?? s.externalUrl,
+    upstreamOrigin: o.upstreamOrigin ?? s.upstreamOrigin,
     tokenResource: o.tokenResource ?? s.tokenResource,
     gameKind: o.gameKind ?? s.gameKind,
     theme: o.theme ?? s.theme,
@@ -357,6 +375,7 @@ export function normalizeCmsStoryRecord(raw: unknown): WorkStoryRecord | null {
   if (typeof o.coverImage === "string") record.coverImage = o.coverImage
   if (typeof o.gameKind === "string" && o.gameKind.trim()) record.gameKind = o.gameKind.trim()
   if (typeof o.externalUrl === "string") record.externalUrl = o.externalUrl.trim()
+  if (typeof o.upstreamOrigin === "string") record.upstreamOrigin = o.upstreamOrigin.trim().replace(/\/+$/, "")
   if (typeof o.tokenResource === "string") record.tokenResource = o.tokenResource.trim()
   if (typeof o.accent === "string") record.accent = o.accent
   if (typeof o.sortOrder === "number" && Number.isFinite(o.sortOrder)) {
@@ -387,7 +406,8 @@ export function createBlankCmsStory(id: string): WorkStoryRecord {
     subtitle: "",
     coverImage: "",
     enginePackage: id,
-    externalUrl: "",
+    externalUrl: `/play/${id}`,
+    upstreamOrigin: "",
     gameKind: "investigation",
     detail: {
       genres: [],
@@ -649,6 +669,7 @@ export function hydrateWorksCatalogFromSources(
           coverImage: prev.coverImage ?? s.coverImage,
           detail: prev.detail ?? s.detail,
           externalUrl: prev.externalUrl ?? s.externalUrl,
+          upstreamOrigin: prev.upstreamOrigin ?? s.upstreamOrigin,
           tokenResource: prev.tokenResource ?? s.tokenResource,
           gameKind: prev.gameKind ?? s.gameKind,
           sortOrder: prev.sortOrder ?? s.sortOrder,
@@ -694,6 +715,7 @@ export function hydrateWorksCatalogFromSources(
         coverImage: o?.coverImage ?? s.coverImage,
         detail: o?.detail ?? s.detail,
         externalUrl: o?.externalUrl ?? s.externalUrl,
+        upstreamOrigin: o?.upstreamOrigin ?? s.upstreamOrigin,
         tokenResource: o?.tokenResource ?? s.tokenResource,
         gameKind: o?.gameKind ?? s.gameKind,
         sortOrder: o?.sortOrder ?? s.sortOrder,
@@ -735,6 +757,7 @@ function storyEntryToOverrideText(st: GasStoryEntry): NonNullable<GasWorksCatalo
   if (st.coverImage) text.coverImage = st.coverImage
   if (st.detail && typeof st.detail === "object") text.detail = st.detail
   if (st.externalUrl) text.externalUrl = st.externalUrl
+  if (st.upstreamOrigin) text.upstreamOrigin = st.upstreamOrigin
   if (st.tokenResource) text.tokenResource = st.tokenResource
   if (st.gameKind) text.gameKind = st.gameKind
   if (typeof st.sortOrder === "number") text.sortOrder = st.sortOrder
@@ -777,6 +800,7 @@ export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: 
       coverImage: merged.coverImage,
       gameKind: merged.gameKind,
       externalUrl: merged.externalUrl,
+      upstreamOrigin: merged.upstreamOrigin,
       tokenResource: merged.tokenResource,
       accent: merged.accent,
       sortOrder: merged.sortOrder,
@@ -802,6 +826,7 @@ export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: 
         coverImage: st.coverImage,
         gameKind: st.gameKind,
         externalUrl: st.externalUrl,
+        upstreamOrigin: st.upstreamOrigin,
         tokenResource: st.tokenResource,
         theme: st.theme || seed.theme,
         sortOrder: st.sortOrder,
@@ -811,10 +836,37 @@ export function serializeWorksCatalogForGas(staticWorks: WorkStoryRecord[], ui: 
     }
   }
 
+  // 同一オリジン play: upstreamOrigin がある作品は externalUrl を /play/<id> に揃える
+  for (const s of allStories) {
+    const wk = workKeyFromStoryRecord(s)
+    const st = hydrated.works?.[wk]?.stories?.[s.id]
+    const origin = (st?.upstreamOrigin || s.upstreamOrigin || "").trim().replace(/\/+$/, "")
+    if (!origin || !st) continue
+    const path = `/play/${encodeURIComponent(s.id)}`
+    st.externalUrl = path
+    st.upstreamOrigin = origin
+    if (overrides[s.id]) {
+      overrides[s.id] = { ...overrides[s.id], externalUrl: path, upstreamOrigin: origin }
+    }
+    if (cmsStories[s.id]) {
+      cmsStories[s.id] = { ...cmsStories[s.id], externalUrl: path, upstreamOrigin: origin }
+    }
+  }
+
+  const playBindings: NonNullable<GasWorksCatalog["playBindings"]> = {}
+  for (const s of allStories) {
+    const wk = workKeyFromStoryRecord(s)
+    const st = hydrated.works?.[wk]?.stories?.[s.id]
+    const origin = (st?.upstreamOrigin || s.upstreamOrigin || "").trim().replace(/\/+$/, "")
+    if (!origin) continue
+    playBindings[s.id] = { upstreamOrigin: origin }
+  }
+
   return {
     featuredId: hydrated.featuredId ?? null,
     overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
     works: hydrated.works,
     cmsStories: Object.keys(cmsStories).length > 0 ? cmsStories : undefined,
+    playBindings: Object.keys(playBindings).length > 0 ? playBindings : undefined,
   }
 }

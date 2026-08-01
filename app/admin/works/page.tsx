@@ -48,6 +48,7 @@ function storyEntryOrDefaults(catalog: GasWorksCatalog, story: StoryRow): GasSto
     status: st.status ?? story.status,
     coverImage: st.coverImage ?? story.coverImage ?? "",
     externalUrl: st.externalUrl ?? story.externalUrl ?? "",
+    upstreamOrigin: st.upstreamOrigin ?? story.upstreamOrigin ?? "",
     tokenResource: st.tokenResource ?? story.tokenResource ?? "",
     gameKind: st.gameKind ?? story.gameKind ?? "",
     sortOrder: st.sortOrder ?? story.sortOrder,
@@ -167,6 +168,7 @@ export default function AdminWorksCmsPage() {
           status: nextS.status ?? base.status,
           coverImage: nextS.coverImage ?? base.coverImage,
           externalUrl: nextS.externalUrl ?? base.externalUrl,
+          upstreamOrigin: nextS.upstreamOrigin ?? base.upstreamOrigin,
           tokenResource: nextS.tokenResource ?? base.tokenResource,
           gameKind: nextS.gameKind ?? base.gameKind,
           sortOrder: nextS.sortOrder ?? base.sortOrder,
@@ -477,16 +479,49 @@ export default function AdminWorksCmsPage() {
                     className={cn(fieldClass, "font-mono text-xs")}
                   />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-[11px] text-[#8b949e]">
-                    プレイ先 URL（ここにいるは /play/koko-ni-iru。別オリジン直リンクはログインが切れます）
-                  </Label>
-                  <Input
-                    value={draft.externalUrl || ""}
-                    onChange={(e) => patchSelectedStory({ externalUrl: e.target.value.trim() })}
-                    placeholder="/play/koko-ni-iru または https://…"
-                    className={cn(fieldClass, "font-mono text-xs")}
-                  />
+                <div className="space-y-1.5 sm:col-span-2 rounded-sm border border-[#30363d] bg-[#0a0c10] p-3">
+                  <p className="text-[11px] font-medium text-[#e6edf3]">同一ログインでプレイ</p>
+                  <p className="mb-2 text-[11px] leading-relaxed text-[#8b949e]">
+                    作品デプロイの origin を入れると、公式の{" "}
+                    <code className="text-[#c9d1d9]">/play/{selected.id}</code>{" "}
+                    から転送します（ブラウザ上は公式と同じオリジン＝ログイン維持）。
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-[#8b949e]">公式プレイ経路（自動）</Label>
+                    <Input
+                      value={`/play/${selected.id}`}
+                      readOnly
+                      className={cn(fieldClass, "font-mono text-xs opacity-80")}
+                    />
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    <Label className="text-[11px] text-[#8b949e]">
+                      作品デプロイ origin（例: https://koko-ni-iru.vercel.app）
+                    </Label>
+                    <Input
+                      value={draft.upstreamOrigin || ""}
+                      onChange={(e) => {
+                        const origin = e.target.value.trim().replace(/\/+$/, "")
+                        patchSelectedStory({
+                          upstreamOrigin: origin,
+                          externalUrl: origin ? `/play/${selected.id}` : draft.externalUrl,
+                        })
+                      }}
+                      placeholder="https://your-work.vercel.app"
+                      className={cn(fieldClass, "font-mono text-xs")}
+                    />
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    <Label className="text-[11px] text-[#8b949e]">
+                      プレイ先 URL（上級・通常は触らない）
+                    </Label>
+                    <Input
+                      value={draft.externalUrl || ""}
+                      onChange={(e) => patchSelectedStory({ externalUrl: e.target.value.trim() })}
+                      placeholder={`/play/${selected.id}`}
+                      className={cn(fieldClass, "font-mono text-xs")}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-[11px] text-[#8b949e]">

@@ -3,7 +3,7 @@
 import { createElement } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { OfficialLoadingScreen } from "@/components/official-site/official-loading-screen"
-import { writePlayLoadHandoff } from "@/lib/official/play-load-handoff"
+import { writePlayLoadHandoff, type PlayEntranceMeta } from "@/lib/official/play-load-handoff"
 
 const HOST_ID = "ns-official-leave-loader"
 
@@ -29,7 +29,7 @@ function absoluteUrl(url: string): string {
   }
 }
 
-/** 遷移先 HTML を実バイト進捗つきで取得（0–52% 相当を返す） */
+/** 遷移先 HTML を実バイト進捗つきで取得 */
 async function prefetchDestination(
   url: string,
   onProgress: (n: number) => void
@@ -44,12 +44,12 @@ async function prefetchDestination(
       headers: { Accept: "text/html,*/*" },
     })
   } catch {
-    onProgress(28)
+    onProgress(35)
     return
   }
-  onProgress(22)
+  onProgress(28)
   if (!res.ok) {
-    onProgress(30)
+    onProgress(40)
     return
   }
 
@@ -61,7 +61,7 @@ async function prefetchDestination(
     } catch {
       /* ignore */
     }
-    onProgress(52)
+    onProgress(88)
     return
   }
 
@@ -72,23 +72,42 @@ async function prefetchDestination(
       if (done) break
       received += value?.byteLength || 0
       if (total > 0) {
-        onProgress(22 + Math.round((received / total) * 30))
+        onProgress(28 + Math.round((received / total) * 60))
       } else {
-        onProgress(Math.min(50, 22 + Math.floor(received / 32_000)))
+        onProgress(Math.min(86, 28 + Math.floor(received / 28_000)))
       }
     }
   } catch {
     /* partial ok */
   }
-  onProgress(52)
+  onProgress(90)
+}
+
+export type LeaveLoaderOptions = {
+  statusLine?: string
+  entrance?: PlayEntranceMeta
 }
 
 /**
- * 作品起動前に CRT ローダーを重ね、遷移先を実プリフェッチしてからハード遷移する。
- * 進捗は sessionStorage handoff で作品側ブリッジへ継続（二重ブート・ちらつき防止）。
+ * 公式側で実ロードを完了させてから作品へ遷移する。
+ * 作品側は％ではなくタイトル／カバーの入場画面を出す。
  */
-export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作品を起動しています…") {
+export function navigateWithOfficialLeaveLoader(
+  url: string,
+  statusLineOrOpts: string | LeaveLoaderOptions = "作品を起動しています…"
+) {
   if (typeof window === "undefined") return
+
+  const opts: LeaveLoaderOptions =
+    typeof statusLineOrOpts === "string"
+      ? { statusLine: statusLineOrOpts }
+      : statusLineOrOpts || {}
+  const statusLine = opts.statusLine || "作品を起動しています…"
+  const entrance: PlayEntranceMeta = {
+    title: opts.entrance?.title || "作品",
+    tagline: opts.entrance?.tagline,
+    coverImage: opts.entrance?.coverImage,
+  }
 
   let host = document.getElementById(HOST_ID)
   if (!host) {
@@ -103,7 +122,7 @@ export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作�
   let navigated = false
 
   const paint = (n: number, line = statusLine) => {
-    progress = Math.max(progress, Math.min(92, Math.round(n)))
+    progress = Math.max(progress, Math.min(100, Math.round(n)))
     root.render(
       createElement(OfficialLoadingScreen, {
         progress,
@@ -115,13 +134,13 @@ export function navigateWithOfficialLeaveLoader(url: string, statusLine = "作�
 
   paint(4)
 
-  // リダイレクトを挟まずポータルへ直接遷移
   const target = resolvePortalUrl(absoluteUrl(url))
 
   void (async () => {
     await prefetchDestination(target, (n) => paint(n, statusLine))
-    paint(Math.max(progress, 55), statusLine)
-    writePlayLoadHandoff(progress, statusLine)
+    paint(100, "入場します…")
+    writePlayLoadHandoff(entrance)
+    await new Promise((r) => window.setTimeout(r, 280))
     if (navigated) return
     navigated = true
     window.location.assign(target)

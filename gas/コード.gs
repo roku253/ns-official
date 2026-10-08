@@ -2029,7 +2029,8 @@ var MUTATING_ACTIONS = {
   adminEnsureGameProgressSlot: true,
   adminUpsertOfficialCredential: true,
   adminDeleteOfficialCredential: true,
-  saveLeaderReplyLedger: true
+  saveLeaderReplyLedger: true,
+  submitSiteInquiry: true
 };
 
 /** スクリプトロックを取得して fn を実行（最大20秒待ち。取れなければ例外→doPost がエラー応答） */
@@ -2110,9 +2111,37 @@ function routeAction_(data) {
     return getLeaderReplyLedger(data);
   } else if (data.action === "saveLeaderReplyLedger") {
     return saveLeaderReplyLedger(data);
+  } else if (data.action === "submitSiteInquiry") {
+    return submitSiteInquiry(data);
   }
   /* saveMemo / getMemos は無認証でシートを読み書きできたため廃止（旧 legacy-static 専用だった） */
   return { success: false, message: "不正なリクエストです。" };
+}
+
+var SITE_INQUIRY_SHEET = "SiteInquiries";
+
+function submitSiteInquiry(data) {
+  if (!leaderReplyLedgerAdminOk_(data)) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var kind = String(data.kind || "");
+  if (kind !== "inquiry" && kind !== "withdrawal") {
+    return { success: false, message: "種別が不正です。" };
+  }
+  var email = String(data.email || "").trim();
+  var message = String(data.message || "").trim();
+  if (!email || email.length > 200 || message.length < 1 || message.length > 4000) {
+    return { success: false, message: "入力内容を確認してください。" };
+  }
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(SITE_INQUIRY_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SITE_INQUIRY_SHEET);
+    sh.getRange("A1:D1").setValues([["created_at", "kind", "email", "message"]]);
+    sh.setFrozenRows(1);
+  }
+  sh.appendRow([new Date().toISOString(), kind, email, message]);
+  return { success: true };
 }
 
 function doPost(e) {

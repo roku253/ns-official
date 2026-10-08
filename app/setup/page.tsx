@@ -9,6 +9,7 @@ import { postGas } from "@/lib/gas"
 import { writeGateEmailAfterSetup } from "@/lib/gate-email"
 import { LS_ACCOUNT } from "@/lib/storage-keys"
 import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
+import { isImeConfirmEnter } from "@/lib/ime-confirm-enter"
 
 const MIN_ID_LEN = 3
 const MIN_PASSWORD_LEN = 8
@@ -207,7 +208,7 @@ function SetupForm() {
             type="password"
             value={password2}
             onChange={(e) => setPassword2(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void submit()}
+            onKeyDown={(e) => e.key === "Enter" && !isImeConfirmEnter(e) && void submit()}
             className="w-full border border-[#c9a227]/20 bg-[#06080c] px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-[#c9a227]/45 focus:outline-none focus:ring-1 focus:ring-[#c9a227]/25"
             autoComplete="new-password"
           />

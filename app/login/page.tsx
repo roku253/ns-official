@@ -17,6 +17,7 @@ import {
 } from "@/lib/gate-email"
 import { getDeviceLabelForAlert, getOrCreateDeviceId } from "@/lib/device-id"
 import { DEFAULT_CASE_ID } from "@/lib/platform/game-routing.generated"
+import { isImeConfirmEnter } from "@/lib/ime-confirm-enter"
 const REL_LOGIN_WINDOW_MS = 1000 * 60 * 60 * 24 * 30
 
 type FlowStep = "terms" | "gate" | "id"
@@ -359,7 +360,7 @@ function LoginContent() {
                     <input
                       value={code}
                       onChange={(e) => setCode(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && void submitGate()}
+                      onKeyDown={(e) => e.key === "Enter" && !isImeConfirmEnter(e) && void submitGate()}
                       placeholder="合言葉"
                       className="w-full border border-[#c9a227]/20 bg-[#06080c] px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-[#c9a227]/45 focus:outline-none focus:ring-1 focus:ring-[#c9a227]/25"
                       autoComplete="off"
@@ -370,7 +371,7 @@ function LoginContent() {
                     <input
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && void submitGate()}
+                      onKeyDown={(e) => e.key === "Enter" && !isImeConfirmEnter(e) && void submitGate()}
                       placeholder="メールアドレス"
                       className="w-full border border-[#c9a227]/20 bg-[#06080c] px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-[#c9a227]/45 focus:outline-none focus:ring-1 focus:ring-[#c9a227]/25"
                       autoComplete="email"
@@ -415,7 +416,7 @@ function LoginContent() {
                     <input
                       value={loginId}
                       onChange={(e) => setLoginId(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && void submitIdLogin()}
+                      onKeyDown={(e) => e.key === "Enter" && !isImeConfirmEnter(e) && void submitIdLogin()}
                       placeholder="ログインID"
                       className="w-full border border-[#c9a227]/20 bg-[#06080c] px-3 py-2.5 font-mono text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-[#c9a227]/45 focus:outline-none focus:ring-1 focus:ring-[#c9a227]/25"
                       autoComplete="username"
@@ -427,7 +428,7 @@ function LoginContent() {
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && void submitIdLogin()}
+                      onKeyDown={(e) => e.key === "Enter" && !isImeConfirmEnter(e) && void submitIdLogin()}
                       placeholder="パスワード"
                       className="w-full border border-[#c9a227]/20 bg-[#06080c] px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-[#c9a227]/45 focus:outline-none focus:ring-1 focus:ring-[#c9a227]/25"
                       autoComplete="current-password"

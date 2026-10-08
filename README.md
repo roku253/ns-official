@@ -34,5 +34,4 @@ npm run dev                  # http://localhost:3000
 
 ## 旧モノリス
 
-以前の一体型は `メイン画面/` にアーカイブ（[`ARCHIVE.md`](../メイン画面/ARCHIVE.md)）。
-GitHub 旧リポ `nazo-portal` もアーカイブ扱い。
+以前の一体型フォルダは削除済み。GitHub の旧リポ `roku253/nazo-portal` は残っているので、公開に切り替えない。

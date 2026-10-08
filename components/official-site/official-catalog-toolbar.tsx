@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Search } from "lucide-react"
 import { OFFICIAL_GAME_KIND_OPTIONS } from "@/lib/official/game-kinds"
 import { cn } from "@/lib/utils"
+import { isImeConfirmEnter } from "@/lib/ime-confirm-enter"
 
 const DEBOUNCE_MS = 320
 
@@ -70,10 +71,9 @@ export function OfficialCatalogToolbar({ className }: { className?: string }) {
           value={draftQ}
           onChange={(e) => setDraftQ(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault()
-              pushCatalogUrl(draftQ, urlKind)
-            }
+            if (e.key !== "Enter" || isImeConfirmEnter(e)) return
+            e.preventDefault()
+            pushCatalogUrl(draftQ, urlKind)
           }}
           placeholder="作品名で検索"
           autoComplete="off"

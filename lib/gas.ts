@@ -1,3 +1,4 @@
+import { gasClientTimeoutMs } from "@/lib/gas-proxy-policy"
 import { resolveGasWebAppUrl } from "@/lib/gas-url"
 
 function gasDirectUrl(): string {
@@ -24,11 +25,13 @@ function postUrlForThisRuntime(): string {
   return `${window.location.origin}/api/gas`
 }
 
-const GAS_FETCH_TIMEOUT_MS = 12_000
-
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), GAS_FETCH_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
     return await fetch(url, { ...init, signal: controller.signal })
   } finally {
@@ -46,14 +49,20 @@ export async function postGas<T extends Record<string, unknown>>(
   payload: Record<string, unknown>
 ): Promise<T> {
   const url = postUrlForThisRuntime()
+  const action = typeof payload.action === "string" ? payload.action : ""
+  const timeoutMs = gasClientTimeoutMs(action)
   let response: Response
   try {
-    response = await fetchWithTimeout(url, {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-    })
+    response = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      },
+      timeoutMs
+    )
   } catch (e) {
     const aborted = e instanceof Error && e.name === "AbortError"
     const hint =
@@ -63,7 +72,7 @@ export async function postGas<T extends Record<string, unknown>>(
     const msg = e instanceof Error ? e.message : String(e)
     throw new Error(
       aborted
-        ? `GAS が ${GAS_FETCH_TIMEOUT_MS / 1000} 秒以内に応答しませんでした。`
+        ? `GAS が ${timeoutMs / 1000} 秒以内に応答しませんでした。`
         : `GAS に接続できません: ${msg}。${hint} .env.local に NEXT_PUBLIC_GAS_URL=（Webアプリの /exec）を設定し、dev を再起動してください。`
     )
   }

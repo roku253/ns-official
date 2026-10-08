@@ -1950,6 +1950,62 @@ function adminDeleteOfficialCredential(data) {
   return { success: false, message: "該当行が見つかりません。" };
 }
 
+var LEADER_REPLY_LEDGER_SHEET = "LeaderReplyLedger";
+var LEADER_REPLY_LEDGER_MAX = 8000;
+
+function leaderReplyLedgerAdminOk_(data) {
+  var key = String(data.adminKey || "").trim();
+  var expected = getAdminPortalKey();
+  return !!expected && key === expected;
+}
+
+function getLeaderReplyLedger(data) {
+  if (!leaderReplyLedgerAdminOk_(data)) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var normalized = String(data.normalizedText || "");
+  if (!normalized) return { success: true, found: false };
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(LEADER_REPLY_LEDGER_SHEET);
+  if (!sh) return { success: true, found: false };
+  var vals = sh.getDataRange().getValues();
+  for (var i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === normalized) {
+      return { success: true, found: true, replyText: String(vals[i][1] || "") };
+    }
+  }
+  return { success: true, found: false };
+}
+
+function saveLeaderReplyLedger(data) {
+  if (!leaderReplyLedgerAdminOk_(data)) {
+    return { success: false, message: "認証に失敗しました。" };
+  }
+  var normalized = String(data.normalizedText || "");
+  var reply = String(data.replyText || "");
+  if (!normalized || !reply) {
+    return { success: false, message: "normalizedText と replyText が必要です。" };
+  }
+  if (normalized.length > LEADER_REPLY_LEDGER_MAX || reply.length > LEADER_REPLY_LEDGER_MAX) {
+    return { success: false, message: "長すぎます。" };
+  }
+  var ss = getTargetSpreadsheet();
+  var sh = ss.getSheetByName(LEADER_REPLY_LEDGER_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(LEADER_REPLY_LEDGER_SHEET);
+    sh.getRange("A1:C1").setValues([["normalized_text", "reply_text", "created_at"]]);
+    sh.setFrozenRows(1);
+  }
+  var vals = sh.getDataRange().getValues();
+  for (var j = 1; j < vals.length; j++) {
+    if (String(vals[j][0]) === normalized) {
+      return { success: true, stored: false };
+    }
+  }
+  sh.appendRow([normalized, reply, new Date().toISOString()]);
+  return { success: true, stored: true };
+}
+
 /**
  * シートに書き込むアクションの一覧。並行リクエストによる
  * 「読み取り→書き戻し」の上書き競合を防ぐため、スクリプトロックの中で実行する。
@@ -1972,7 +2028,8 @@ var MUTATING_ACTIONS = {
   adminSetNews: true,
   adminEnsureGameProgressSlot: true,
   adminUpsertOfficialCredential: true,
-  adminDeleteOfficialCredential: true
+  adminDeleteOfficialCredential: true,
+  saveLeaderReplyLedger: true
 };
 
 /** スクリプトロックを取得して fn を実行（最大20秒待ち。取れなければ例外→doPost がエラー応答） */
@@ -2049,6 +2106,10 @@ function routeAction_(data) {
     return issueAccessToken(data);
   } else if (data.action === "validateAccessToken") {
     return validateAccessToken(data);
+  } else if (data.action === "getLeaderReplyLedger") {
+    return getLeaderReplyLedger(data);
+  } else if (data.action === "saveLeaderReplyLedger") {
+    return saveLeaderReplyLedger(data);
   }
   /* saveMemo / getMemos は無認証でシートを読み書きできたため廃止（旧 legacy-static 専用だった） */
   return { success: false, message: "不正なリクエストです。" };

@@ -1,7 +1,10 @@
+import { GAS_PROXY_LOCK_TIMEOUT_MS } from "@/lib/gas-proxy-policy"
+
 /**
- * サーバー側からプレイヤー向け GAS doPost を呼ぶ（adminKey なし）
+ * サーバー側からプレイヤー向け GAS doPost を呼ぶ（adminKey なし）。
+ * 待ちは中継のロック系と同じ 25 秒（以前の 90 秒は中継より長い）。
  */
-const GAS_FETCH_TIMEOUT_MS = 90_000
+const GAS_FETCH_TIMEOUT_MS = GAS_PROXY_LOCK_TIMEOUT_MS
 
 function gasWebAppUrl(): string {
   const url = (process.env.GAS_WEBAPP_URL || process.env.NEXT_PUBLIC_GAS_URL || "").trim()
